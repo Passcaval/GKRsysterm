@@ -5,10 +5,10 @@ import {
   validEmail,
   missingForIntent,
   visibleRunItems,
-} from "../src/workflow-domain.ts";
-import { RunEventDecoder } from "../src/run-sse.ts";
-import { schemaErrors } from "../src/schema.ts";
-import type { RecommendationRun } from "../src/types.ts";
+} from "../../src/frontend/src/workflow-domain.ts";
+import { RunEventDecoder } from "../../src/frontend/src/run-sse.ts";
+import { schemaErrors } from "../../src/frontend/src/schema.ts";
+import type { RecommendationRun } from "../../src/frontend/src/types.ts";
 test("昵称按NFC及Unicode码点处理，扩展汉字合法且不做NFKC或空格裁剪", () => {
   for (const name of ["小明", "Alice", "中Ab文", "𠀀𠀀𠀀𠀀𠀀"])
     assert.equal(validateNickname(name), true, name);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { lightBeamPolygon } from "../src/voyage.ts";
+import { lightBeamPolygon } from "../../src/frontend/src/voyage.ts";
 test("灯光中心精确连接灯室和星图，并保持目标端对称", () => {
   const source = { x: 820, y: 110 },
     target = { x: 430, y: 360 };

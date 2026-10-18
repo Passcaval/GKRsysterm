@@ -18,6 +18,7 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 src/backend/runtime/
+test/reports/
 
 # Generated standalone preview (rebuild with pnpm run standalone)
 src/frontend/夜航-交互预览.html

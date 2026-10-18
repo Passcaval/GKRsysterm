@@ -9,7 +9,9 @@ import { join } from "node:path";
 const base = process.env.NV_TEST_API;
 if (!/^http:\/\/127\.0\.0\.1:\d+\/api\/v1$/.test(base || ""))
   throw new Error("Only the isolated local test server is supported");
-const require = createRequire(import.meta.url);
+const require = createRequire(
+  new URL("../../src/frontend/package.json", import.meta.url),
+);
 const viteRequire = createRequire(require.resolve("vite"));
 const { build } = await import(
   pathToFileURL(viteRequire.resolve("esbuild")).href
@@ -29,7 +31,9 @@ globalThis.fetch = async (url, options = {}) => {
 try {
   const outfile = join(dir, "api.mjs");
   await build({
-    entryPoints: [fileURLToPath(new URL("../src/api.ts", import.meta.url))],
+    entryPoints: [
+      fileURLToPath(new URL("../../src/frontend/src/api.ts", import.meta.url)),
+    ],
     outfile,
     bundle: true,
     platform: "node",

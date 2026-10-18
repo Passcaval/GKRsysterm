@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { campusPosts, sailingPoint } from "../src/campus.ts";
-import type { Post } from "../src/types.ts";
+import { campusPosts, sailingPoint } from "../../src/frontend/src/campus.ts";
+import type { Post } from "../../src/frontend/src/types.ts";
 
 const post = (id: string, schoolId: string, patch: Partial<Post> = {}): Post =>
   ({

@@ -53,19 +53,14 @@ pnpm run dev
 
 ```powershell
 docker compose exec -T postgres createdb -U night_voyage night_voyage_test
-.venv/Scripts/python.exe -m scripts.check_migrations
-.venv/Scripts/python.exe -m ruff check app tests scripts
-.venv/Scripts/python.exe -m ruff format --check app tests scripts
-.venv/Scripts/python.exe -m scripts.export_openapi --check
-$env:NV_LIVE_FRONTEND = '1'
-.venv/Scripts/python.exe -m pytest -q
+.venv/Scripts/python.exe ../../test/run.py --suite backend
 ```
 
 未设置 TEST_DATABASE_URL 时自动沿用本地连接参数、只把库名改为 `night_voyage_test`。共享数据库环境必须显式指定专用测试库，不能对开发数据运行回退或测试。完整测试需要 Node.js、前端锁文件依赖和 PATH 中的 ffmpeg/ffprobe；不设置 NV_LIVE_FRONTEND 时只跳过真实前端适配器测试。该测试启动临时 Uvicorn 和 Worker，调用当前 v0.4 的实际 `src/frontend/src/api.ts`，最后停止临时服务；其账号和招生数据均为合成测试材料。
 
 Windows 若切换执行账户后遇到临时目录权限错误，可用自己拥有的、新建且未使用的目录作为 pytest `--basetemp`，并用 `-p no:cacheprovider` 避免旧缓存权限。pytest 会清理指定临时目录，不能指向已有业务文件。最新整合验证结果见[开发日志](../../docs/开发日志.md)。有一个 Starlette 对 TestClient 的 httpx 弃用提示，不影响当前测试。
 
-Linux/CI 使用 `.venv/bin/python` 或激活后的 `python`；GitHub Actions 已配置 PostgreSQL 服务、迁移、契约、测试及真实适配器联调。
+测试代码已集中到仓库根目录 `test/backend`、`test/frontend` 和 `test/integration`；统一入口自动启用真实前端联调并保存报告，详见[测试说明](../../test/README.md)。直接调用pytest时仍需自行设置NV_LIVE_FRONTEND。Linux/CI 使用 `.venv/bin/python` 或激活后的 `python`；GitHub Actions 使用同一入口，配置 PostgreSQL 服务、迁移、契约、测试及真实适配器联调。
 
 ## 数据与维护
 

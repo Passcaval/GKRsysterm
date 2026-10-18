@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { loginInput, canReview, loginDestination } from "../src/auth.ts";
-import { authenticateDemo } from "../src/demo-auth.ts";
+import {
+  loginInput,
+  canReview,
+  loginDestination,
+} from "../../src/frontend/src/auth.ts";
+import { authenticateDemo } from "../../src/frontend/src/demo-auth.ts";
 
 test("统一登录只提交登录标识和密码，不提交身份；密码不被裁剪", () => {
   assert.deepEqual(loginInput(" student@example.test ", " pass "), {

@@ -14,15 +14,18 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const doc = JSON.parse(
-  readFileSync(new URL("../docs/openapi.json", import.meta.url), "utf8"),
+  readFileSync(
+    new URL("../../src/frontend/docs/openapi.json", import.meta.url),
+    "utf8",
+  ),
 );
 test("共享契约与前端副本保持一致", () => {
-  const shared = new URL(
-    "../../../docs/contracts/openapi.json",
-    import.meta.url,
+  const shared = new URL("../../docs/contracts/openapi.json", import.meta.url);
+  assert.ok(
+    existsSync(shared),
+    "Shared contract must exist at the repository root",
   );
-  if (existsSync(shared))
-    assert.deepEqual(JSON.parse(readFileSync(shared, "utf8")), doc);
+  assert.deepEqual(JSON.parse(readFileSync(shared, "utf8")), doc);
 });
 test("每个OpenAPI引用可解析，且操作标识唯一", () => {
   const ids: string[] = [];
@@ -90,7 +93,10 @@ test("contract:check拒绝陈旧产物、不自动改写，并接受CRLF副本",
     for (const dir of [scripts, docs, shared, join(tempRoot, ".git")])
       mkdirSync(dir, { recursive: true });
     const script = join(scripts, "contract.mjs");
-    copyFileSync(new URL("../scripts/contract.mjs", import.meta.url), script);
+    copyFileSync(
+      new URL("../../src/frontend/scripts/contract.mjs", import.meta.url),
+      script,
+    );
     assert.equal(
       spawnSync(process.execPath, [script], { encoding: "utf8" }).status,
       0,
