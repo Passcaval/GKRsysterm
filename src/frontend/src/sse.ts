@@ -15,7 +15,12 @@ export class EventDecoder {
         .map((l) => l.slice(5).replace(/^ /, ""))
         .join("\n");
       if (!data) continue;
-      const value = JSON.parse(data) as ChatEvent;
+      const value = Object.fromEntries(
+        Object.entries(JSON.parse(data)).map(([k, v]) => [
+          k.replace(/_([a-z])/g, (_, c) => c.toUpperCase()),
+          v,
+        ]),
+      ) as unknown as ChatEvent;
       if (
         ![
           "tool_start",

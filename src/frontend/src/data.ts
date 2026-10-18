@@ -1,5 +1,10 @@
 import type { Bootstrap, Profile, School, Post } from "./types";
 export const sampleProfile: Profile = {
+  version: 1,
+  profileVersionId: "profile-demo-v1",
+  examCategory: "普通类",
+  rankCohort: "浙江普通类省内位次",
+  budgetScope: "tuition",
   province: "浙江",
   year: 2026,
   score: 628,
@@ -278,6 +283,10 @@ export const initial: Bootstrap = {
     name: "未来的航海家",
     role: "student",
     verified: false,
+    userId: "UDEMO-STUDENT",
+    email: "student@example.com",
+    emailVerified: false,
+    permissions: [],
   },
   profile: sampleProfile,
   schools,

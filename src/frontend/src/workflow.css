@@ -1,0 +1,334 @@
+.identity-panel label,
+.registration-form label,
+.application-receipt label,
+.profile-proposal label,
+.run-create label,
+.run-item label,
+.memory-row label,
+.registration-review label {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 16px 0;
+  color: #c8cdd2;
+  font-size: 12px;
+}
+.identity-panel .button,
+.identity-panel form > .button,
+.registration-form > .button,
+.application-receipt .button {
+  margin-top: 16px;
+}
+.identity-panel .segmented button {
+  font-size: 12px;
+  padding: 9px 15px;
+}
+.identity-panel .segmented {
+  margin-bottom: 22px;
+}
+.identity-panel .muted {
+  line-height: 1.9;
+  font-size: 11px;
+}
+.identity-panel input,
+.registration-form input:not([type="checkbox"]),
+.registration-form textarea,
+.run-create textarea,
+.profile-proposal textarea,
+.registration-review textarea,
+.memory-row input {
+  width: 100%;
+  min-width: 0;
+}
+.identity-panel p,
+.application-receipt p,
+.run-progress p {
+  overflow-wrap: anywhere;
+}
+.application-receipt,
+.registration-form {
+  max-width: 880px;
+}
+.application-receipt textarea {
+  font-family: monospace;
+  font-size: 12px;
+}
+.registration-form audio,
+.registration-review audio {
+  max-width: 100%;
+  display: block;
+  margin: 16px 0;
+}
+.registration-review {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.8fr) minmax(0, 1.6fr);
+  gap: 22px;
+  align-items: start;
+  margin-top: 24px;
+}
+.review-application {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  align-items: flex-start;
+  text-align: left;
+  gap: 8px;
+  border-bottom: 1px solid #d9c28d1c;
+  padding: 17px 4px;
+  color: #d0d4d8;
+  overflow-wrap: anywhere;
+}
+.review-application strong {
+  font-size: 13px;
+  font-weight: 400;
+  color: #e4c995;
+}
+.review-application span {
+  font-size: 11px;
+}
+.review-application small {
+  font-size: 9px;
+  color: #99a6b7;
+}
+.original-evidence {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 2;
+  min-height: 60px;
+  font-size: 13px;
+}
+.registration-review > section h3 {
+  margin: 25px 0 14px;
+  font-size: 16px;
+}
+.registration-review > section .muted {
+  overflow-wrap: anywhere;
+}
+.profile-proposal {
+  margin-bottom: 28px;
+}
+.profile-proposal h2 {
+  font-size: 19px;
+  font-weight: 400;
+}
+.profile-proposal pre {
+  max-width: 100%;
+  overflow: auto;
+  background: #0a1225;
+  padding: 20px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.run-create textarea {
+  min-height: 85px;
+}
+.run-progress {
+  border-color: #d9bf8438;
+  margin: 25px 0;
+}
+.run-progress h2 {
+  font-size: 23px;
+  font-weight: 400;
+  color: #e2c48b;
+}
+.run-progress small {
+  line-height: 1.8;
+  font-size: 11px;
+  display: block;
+}
+.run-lane {
+  margin: 35px 0;
+}
+.run-lane > h3 {
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: #cec6ae;
+}
+.run-lane .school-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.run-item {
+  min-width: 0;
+}
+.run-item h3 {
+  font-size: 18px;
+  font-weight: 400;
+}
+.run-item p {
+  font-size: 12px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.run-item .muted {
+  font-size: 10px;
+}
+.run-item small {
+  font-size: 10px;
+  color: #95a2b4;
+}
+.run-item summary {
+  font-size: 11px;
+  color: #d9bf86;
+  cursor: pointer;
+  margin-top: 16px;
+}
+.run-item .form-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.run-item .button {
+  font-size: 11px;
+}
+.run-item .text-button {
+  font-size: 11px;
+}
+.tier.unknown,
+.unknown .map-tier {
+  color: #b1b9c4;
+}
+.tier.unknown {
+  border: 1px solid #a3aec733;
+  background: #b9c7e60b;
+}
+.star-node.unknown {
+  color: #9daec2;
+}
+.history-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 0;
+  border-bottom: 1px solid #b9a67c20;
+  align-items: flex-start;
+  text-align: left;
+  width: 100%;
+  color: #d6c69e;
+}
+.history-row small {
+  color: #98a4b5;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.memory-row {
+  border-bottom: 1px solid #b9a67c20;
+  padding: 12px 0;
+}
+.session-error {
+  position: relative;
+  z-index: 1000;
+  background: #413326;
+  color: #f0d4aa;
+  padding: 15px 30px;
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  font-size: 12px;
+}
+.session-error button {
+  text-decoration: underline;
+}
+.atlas-load-more {
+  position: absolute;
+  z-index: 10;
+  bottom: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  max-width: calc(100% - 32px);
+  background: #172638ec;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #d3c1942a;
+}
+.unit-row {
+  padding: 22px 0;
+  border-top: 1px solid #b9a67c20;
+  margin-top: 20px;
+}
+.unit-row h3 {
+  font-size: 17px;
+  font-weight: 400;
+}
+.unit-row p {
+  font-size: 11px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.unit-row .form-actions {
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.unit-row .button {
+  font-size: 11px;
+}
+.claim-list {
+  margin: 30px 0;
+  padding-top: 25px;
+  border-top: 1px solid #736c5d30;
+}
+.claim-list h2 {
+  font-size: 20px;
+}
+.claim-list h3 {
+  font-size: 16px;
+}
+.claim-list > .muted {
+  font-size: 12px;
+}
+.claim-list .evidence {
+  background: #fff4;
+  border-color: #736c5d30;
+}
+.claim-list .evidence small,
+.claim-list .evidence .muted {
+  color: #6d6b67;
+}
+.claim-list p {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.registration-review .switch-label {
+  flex-direction: row;
+  align-items: center;
+}
+.registration-review input[type="checkbox"] {
+  width: auto;
+}
+@media (max-width: 900px) {
+  .run-lane .school-grid {
+    grid-template-columns: 1fr;
+  }
+  .registration-review {
+    grid-template-columns: 1fr;
+  }
+  .registration-review > aside {
+    max-height: 300px;
+    overflow: auto;
+  }
+  .session-error {
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 540px) {
+  .run-progress .section-title {
+    flex-wrap: wrap;
+  }
+  .run-progress p {
+    font-size: 11px;
+  }
+  .run-create .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .identity-panel .form-actions,
+  .registration-form .form-actions {
+    flex-wrap: wrap;
+  }
+  .run-progress .form-actions {
+    flex-wrap: wrap;
+  }
+  .registration-review {
+    gap: 15px;
+  }
+}

@@ -11,7 +11,9 @@ import {
 import { api, isMock } from "../api";
 import { Evidence, Modal } from "../components";
 import type { ChatMessage } from "../types";
+import { useApp } from "../store";
 export default function Chat({ onClose }: { onClose: () => void }) {
+  const { navigate } = useApp();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -213,6 +215,22 @@ export default function Chat({ onClose }: { onClose: () => void }) {
             void send();
           }}
         >
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => {
+              sessionStorage.setItem(
+                "nv-run-question",
+                input ||
+                  messages.filter((m) => m.role === "user").at(-1)?.text ||
+                  "",
+              );
+              onClose();
+              navigate("/routes");
+            }}
+          >
+            转为可追溯推荐任务 <ArrowUpRight size={13} />
+          </button>
           <div className="chat-input">
             <input
               ref={field}
@@ -246,7 +264,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
             {isMock
               ? "本地演示回复 · 未连接真实模型"
               : "模型生成内容，请结合原始来源核对"}{" "}
-            · 最终以官方招生政策为准
+            · 普通问答不作为已校验的正式报考建议
           </small>
         </form>
       </section>

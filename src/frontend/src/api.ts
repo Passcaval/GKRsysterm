@@ -1,3 +1,4 @@
+import { streamChat } from "./chat-stream";
 import type {
   Bootstrap,
   Profile,
@@ -12,29 +13,38 @@ import type {
 import { initial } from "./data";
 import { classify, eligible, validateProfile } from "./domain";
 import { EventDecoder } from "./sse";
-import { canReview, loginInput } from "./auth";
-import { authenticateDemo } from "./demo-auth";
-export const isMock = import.meta.env?.VITE_API_MODE !== "http";
-const BASE = (import.meta.env?.VITE_API_BASE_URL || "/api/v1").replace(
-  /\/$/,
-  "",
-);
+import { createWorkflowApi } from "./workflow-api";
+import {
+  isMock,
+  BASE,
+  request,
+  ApiError,
+  bootstrapFromWire,
+  fromWire,
+} from "./transport";
+export { isMock, ApiError, apiMode } from "./transport";
 const KEY = "night-voyage-demo-v1";
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-    public requestId?: string,
-  ) {
-    super(message);
-  }
-}
 function db(): Bootstrap {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) || "null");
-    return value?.schema === 1
-      ? { ...structuredClone(initial), ...value.data }
-      : structuredClone(initial);
+    const d: Bootstrap =
+      value?.schema === 1
+        ? { ...structuredClone(initial), ...value.data }
+        : structuredClone(initial);
+    for (const p of d.posts) {
+      p.version ??= 1;
+      if (p.isMine && !p.ownerId && d.user) p.ownerId = d.user.id;
+    }
+    if (d.profile) {
+      d.profile.version ??= 1;
+      d.profile.profileVersionId ??= "profile-demo-v1";
+    }
+    if (d.user) {
+      d.user.permissions ??=
+        d.user.role === "reviewer" ? ["content:review"] : [];
+      d.user.userId ??= "UDEMO-STUDENT";
+    }
+    return d;
   } catch {
     return structuredClone(initial);
   }
@@ -64,101 +74,24 @@ function record(event: Record<string, unknown>) {
     localStorage.setItem(key, JSON.stringify(events));
   }
 }
-async function request<T>(
-  path: string,
-  method = "GET",
-  body?: unknown,
-): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
-  try {
-    const response = await fetch(BASE + path, {
-      method,
-      credentials: "include",
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        ...(body instanceof FormData
-          ? {}
-          : { "Content-Type": "application/json" }),
-        ...(method !== "GET" ? { "X-Requested-With": "NightVoyage" } : {}),
-      },
-      body:
-        body === undefined
-          ? undefined
-          : body instanceof FormData
-            ? body
-            : JSON.stringify(body),
-    });
-    const value = await response.json().catch(() => null);
-    if (!response.ok)
-      throw new ApiError(
-        response.status,
-        value?.error?.message || `请求失败（${response.status}）`,
-        value?.request_id ?? value?.requestId,
-      );
-    if (!value || !("data" in value))
-      throw new ApiError(502, "接口返回格式不符合约定");
-    return value.data as T;
-  } catch (e) {
-    if (e instanceof ApiError) throw e;
-    throw new ApiError(
-      0,
-      e instanceof DOMException && e.name === "AbortError"
-        ? "请求超时，请稍后重试"
-        : "暂时无法连接服务，请检查网络后重试",
-    );
-  } finally {
-    clearTimeout(timer);
-  }
-}
 const delay = () => new Promise((resolve) => setTimeout(resolve, 180));
 export const api = {
   async bootstrap(): Promise<Bootstrap> {
-    if (!isMock) return request("/bootstrap");
+    if (!isMock)
+      return bootstrapFromWire(
+        await request("/bootstrap", "GET", undefined, { raw: true }),
+      );
     await delay();
-    return db();
-  },
-  async login(identifier: string, password: string): Promise<User> {
-    const input = loginInput(identifier, password);
-    if (!isMock) return request("/auth/login", "POST", input);
-    await delay();
-    const user = authenticateDemo(input);
-    if (!user) throw new ApiError(401, "账号或密码错误");
     const d = db();
-    d.user = user;
-    save(d);
-    return d.user;
-  },
-  async logout() {
-    if (!isMock) return request<null>("/auth/logout", "POST");
-    const d = db();
-    d.user = null;
-    save(d);
-    return null;
-  },
-  async profile(profile: Profile): Promise<Profile> {
-    const errors = validateProfile(profile);
-    if (errors.length) throw new Error(errors.join("；"));
-    if (!isMock) return request("/me/profile", "PUT", profile);
-    const d = db();
-    requireUser(d);
-    d.profile = profile;
-    save(d);
-    return profile;
-  },
-  async deleteProfile() {
-    if (!isMock) return request<null>("/me/data", "DELETE");
-    const d = db();
-    requireUser(d);
-    localStorage.removeItem("night-voyage-demo-events");
-    d.profile = null;
-    d.plan = { ...d.plan, entries: [], version: d.plan.version + 1 };
-    d.favorites = [];
-    d.verifications = [];
-    d.posts = d.posts.filter((p) => !p.isMine);
-    save(d);
-    return null;
+    return {
+      ...d,
+      posts: d.posts.filter(
+        (p) =>
+          (p.status === "published" && p.visibility !== "private") ||
+          p.isMine ||
+          d.user?.permissions?.includes("content:review"),
+      ),
+    };
   },
   async favorite(schoolId: string, active: boolean): Promise<string[]> {
     if (!isMock)
@@ -174,67 +107,14 @@ export const api = {
     save(d);
     return d.favorites;
   },
-  async recommendations(risk: number): Promise<Recommendation[]> {
-    if (!isMock)
-      return request("/recommendations", "POST", { riskPreference: risk });
-    await delay();
-    const d = db();
-    const p = d.profile;
-    if (!p) throw new Error("请先建立考生档案");
-    if (p.province !== "浙江")
-      throw new Error("演示数据仅覆盖浙江，其他省份暂不支持生成推荐");
-    return d.schools
-      .filter((s) => eligible(p, s) && s.tuition <= p.budget)
-      .map((s) => ({
-        schoolId: s.id,
-        major: s.majors[0],
-        tier: classify(p.rank, s.rank, risk),
-        matchScore: Math.max(
-          45,
-          Math.round(96 - Math.abs(p.rank - s.rank) / 1400),
-        ),
-        reasons: [
-          `选科符合示例报考条件，${s.city}符合${p.cities.includes(s.city) ? "你的城市偏好" : "可探索的地域范围"}`,
-          `学费 ${s.tuition} 元/年，在你的预算内`,
-        ],
-        warnings: [
-          "规则演示，不代表录取概率；请核对同省、同批次、同专业组和当年的招生政策",
-        ],
-        sourceIds: [...s.sourceIds, "inference-demo"],
-        postIds: d.posts
-          .filter(
-            (x) =>
-              x.schoolId === s.id &&
-              x.signal === "strong" &&
-              x.status === "published",
-          )
-          .map((x) => x.id),
-      }));
-  },
-  async explanation(
-    schoolId: string,
-  ): Promise<{ text: string; sourceIds: string[] }> {
-    if (!isMock)
-      return request("/recommendations/explain", "POST", { schoolId });
-    const d = db();
-    const s = d.schools.find((x) => x.id === schoolId);
-    if (!s || !d.profile) throw new Error("请选择院校并完善档案");
-    return {
-      text: !eligible(d.profile, s)
-        ? "当前选科不满足该示例专业的要求。"
-        : s.tuition > d.profile.budget
-          ? "该校示例学费超过你设置的预算。"
-          : `这所学校已在可探索范围内；与当前位次的差距会影响冲稳保分类。请结合专业、招生计划和最新政策进一步判断。`,
-      sourceIds: s.sourceIds,
-    };
-  },
   async plan(plan: Plan): Promise<Plan> {
     if (!isMock) return request("/me/plan", "PUT", plan);
     const d = db();
     requireUser(d);
     if (d.plan.version !== plan.version)
       throw new ApiError(409, "方案已更新，请刷新后重试");
-    if (plan.entries.length > 40) throw new Error("演示方案最多 40 项");
+    if (d.plan.maxEntries && plan.entries.length > d.plan.maxEntries)
+      throw new Error(`方案最多 ${d.plan.maxEntries} 项`);
     d.plan = { ...plan, version: plan.version + 1 };
     save(d);
     return d.plan;
@@ -256,10 +136,13 @@ export const api = {
       ),
     );
     return {
-      eligible: plan.entries.every((e) => {
-        const s = d.schools.find((s) => s.id === e.schoolId);
-        return !!s && eligible(p, s);
-      }),
+      eligible:
+        p.subjects.length !== 3
+          ? null
+          : plan.entries.every((e) => {
+              const s = d.schools.find((s) => s.id === e.schoolId);
+              return !!s && eligible(p, s);
+            }),
       warnings: [
         ...(!tiers.includes("safe") ? ["方案尚缺少保底层次的院校。"] : []),
         ...(plan.entries.some((e) => !e.adjustment)
@@ -273,13 +156,21 @@ export const api = {
       probabilities: null,
     };
   },
-  async submitPost(input: {
-    schoolId: string;
-    topic: string;
-    title: string;
-    body: string;
-  }): Promise<Post> {
-    if (!isMock) return request("/posts", "POST", input);
+  async submitPost(
+    input: {
+      schoolId: string;
+      topic: string;
+      title: string;
+      body: string;
+      campusId?: string | null;
+      majorId?: string | null;
+      experiencedAt?: string | null;
+      visibility?: "public" | "private";
+      originality?: "original";
+    },
+    key = crypto.randomUUID(),
+  ): Promise<Post> {
+    if (!isMock) return request("/posts", "POST", input, { key });
     const d = db();
     requireUser(d);
     if (input.title.length < 5 || input.body.length < 80)
@@ -288,6 +179,9 @@ export const api = {
       ...d.posts[0],
       ...input,
       isMine: true,
+      ownerId: d.user!.id,
+      version: 1,
+      visibility: input.visibility || "public",
       id: "local-" + crypto.randomUUID(),
       author: "匿名贡献者 · 待核验",
       year: new Date().getFullYear(),
@@ -297,12 +191,13 @@ export const api = {
       helpful: 0,
       citations: 0,
       sourceIds: [],
+      claims: [],
       trust: {
-        identity: 0,
-        specificity: 0,
-        corroboration: 0,
+        identity: null,
+        specificity: null,
+        corroboration: null,
         freshness: 100,
-        anomaly: 0,
+        anomaly: null,
         supporting: 0,
         opposing: 0,
         explanation: [
@@ -341,48 +236,53 @@ export const api = {
     record({ userId: u.id, postId, kind, reason });
     return { accepted: true };
   },
-  async verify(schoolId: string, file: File): Promise<Verification> {
-    const form = new FormData();
-    form.set("schoolId", schoolId);
-    form.set("document", file);
-    if (!isMock) return request("/verifications", "POST", form);
+  async moderation(
+    cursor: string | null = null,
+  ): Promise<{ items: Post[]; nextCursor: string | null }> {
+    if (!isMock)
+      return request(
+        "/admin/reviews" +
+          (cursor ? "?cursor=" + encodeURIComponent(cursor) : ""),
+      );
     const d = db();
-    if (!d.user) throw new ApiError(401, "请先登录");
-    const v: Verification = {
-      id: crypto.randomUUID(),
-      schoolId,
-      status: "pending",
-      submittedAt: new Date().toISOString(),
+    if (!d.user?.permissions?.includes("content:review"))
+      throw new ApiError(403, "需要审核员权限");
+    const rows = d.posts.filter((p) => p.status === "pending"),
+      start = Number(cursor || 0);
+    return {
+      items: rows.slice(start, start + 12),
+      nextCursor: start + 12 < rows.length ? String(start + 12) : null,
     };
-    d.verifications.unshift(v);
-    save(d);
-    return v;
-  },
-  async moderation(): Promise<Post[]> {
-    if (!isMock) return request("/admin/reviews");
-    const d = db();
-    if (!canReview(d.user)) throw new ApiError(403, "需要内容审核权限");
-    return d.posts.filter((p) => p.status === "pending");
   },
   async review(
     postId: string,
     decision: "approve" | "reject",
     reason: string,
+    expectedVersion: number = 1,
   ): Promise<Post> {
     if (!isMock)
       return request(`/admin/reviews/${encodeURIComponent(postId)}`, "POST", {
         decision,
         reason,
+        expectedVersion,
       });
     const d = db();
-    if (!d.user || !canReview(d.user))
-      throw new ApiError(403, "需要内容审核权限");
+    if (!d.user?.permissions?.includes("content:review"))
+      throw new ApiError(403, "需要审核员权限");
     const p = d.posts.find((p) => p.id === postId);
     if (!p) throw new Error("帖子不存在");
+    if ((p.version || 1) !== expectedVersion)
+      throw new ApiError(
+        409,
+        "帖子版本已更新",
+        undefined,
+        "POST_VERSION_CONFLICT",
+      );
     if (p.status !== "pending") throw new ApiError(409, "该帖子已处理");
     if (reason.trim().length < 5) throw new Error("请至少填写5字审核理由");
     record({ userId: d.user.id, postId, kind: "review-" + decision, reason });
     p.status = decision === "approve" ? "published" : "rejected";
+    p.version = (p.version || 1) + 1;
     save(d);
     return p;
   },
@@ -417,9 +317,7 @@ export const api = {
         text: "完成示例证据检索",
       };
       const p = db().profile;
-      const text = p
-        ? `根据你在${p.province}的档案（${p.score}分、位次${p.rank.toLocaleString()}），可以先了解杭州电子科技大学与南京邮电大学的计算机、电子信息方向。\n\n建议同时核对选科要求、历年专业组位次和招生计划，再结合已核验的校园体验。你提到的“${message.slice(0, 70)}”也需要与个人偏好一起考虑。\n\n这是本地演示回复，没有调用真实大模型。示例位次与帖子不能用于实际填报。`
-        : "请先建立考生档案。生源省份、报考年份、选科和位次决定可适用的数据范围。此处为演示回复。";
+      const text = `这是普通资料问答的本地演示，没有调用模型，也不发布正式报考建议。你询问的“${message.slice(0, 70)}”可以结合院校官方资料和已公开校园回声继续探索。需要个性化筛选或风险分析时，请使用下方入口创建推荐任务，确认画像、回答补问，并查看校验后的结构化结果。`;
       for (const chunk of text.match(/.{1,14}|\n/g) || []) {
         if (signal.aborted) return;
         yield { type: "delta", text: chunk };
@@ -440,46 +338,7 @@ export const api = {
       };
       return;
     }
-    const res = await fetch(BASE + "/chat/stream", {
-      method: "POST",
-      credentials: "include",
-      signal,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-        "X-Requested-With": "NightVoyage",
-      },
-      body: JSON.stringify({ message, conversationId }),
-    });
-    if (!res.ok || !res.body)
-      throw new ApiError(res.status, "对话服务暂时不可用");
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    const parser = new EventDecoder();
-    let done = false;
-    const timer = setTimeout(() => reader.cancel(), 120000);
-    try {
-      while (true) {
-        const part = await reader.read();
-        if (part.done) break;
-        for (const event of parser.push(
-          decoder.decode(part.value, { stream: true }),
-        )) {
-          if (event.type === "done") done = true;
-          if (event.type === "error")
-            throw new Error(event.text || "模型服务返回错误");
-          yield event;
-        }
-      }
-      for (const e of parser.push(decoder.decode())) {
-        if (e.type === "done") done = true;
-        yield e;
-      }
-      parser.finish();
-      if (!done) throw new Error("回答连接已中断，请重试");
-    } finally {
-      clearTimeout(timer);
-      reader.releaseLock();
-    }
+    yield* streamChat(message, conversationId, signal);
   },
+  ...createWorkflowApi({ db, save, requireUser }),
 };

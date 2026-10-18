@@ -1,3 +1,4 @@
+import { errorText } from "../transport";
 import { useState } from "react";
 import { ArrowRight, Compass } from "lucide-react";
 import { api, isMock } from "../api";
@@ -44,7 +45,7 @@ export default function Login() {
               notify("已登录");
               navigate(loginDestination(snapshot.user));
             } catch (e) {
-              setError((e as Error).message);
+              setError(errorText(e));
             } finally {
               setBusy(false);
             }
@@ -86,6 +87,17 @@ export default function Login() {
             <ArrowRight size={16} />
           </button>
         </form>
+        <div className="form-actions">
+          <button className="text-button" onClick={() => navigate("/register")}>
+            申请注册
+          </button>
+          <button
+            className="text-button"
+            onClick={() => navigate("/application")}
+          >
+            查询申请状态
+          </button>
+        </div>
         {isMock && (
           <p className="form-hint">
             当前为本地演示，请使用项目说明中的演示账号。

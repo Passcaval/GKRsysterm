@@ -9,7 +9,7 @@ export function CampusSky({
   count,
 }: {
   school: School;
-  count: number;
+  count: number | null;
 }) {
   const { navigate } = useApp();
   const [paused, setPaused] = useState(false);
@@ -54,7 +54,9 @@ export function CampusSky({
             {school.city}
           </span>
           <span>{school.level}</span>
-          <span>{count} 封已公开来信</span>
+          <span>
+            {count === null ? "按需读取本校来信" : `${count} 封已公开来信`}
+          </span>
         </div>
         <button
           className="text-button campus-profile-link"

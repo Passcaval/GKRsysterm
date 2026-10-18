@@ -1,7 +1,5 @@
-# 前后端接口对接规范
+# 前后端接口对接规范 v0.4
 
-共享规范统一维护在[仓库 docs/contracts/API.md](../../../docs/contracts/API.md)。
+统一维护在[共享接口规范](../../../docs/contracts/API.md)，机器契约见[OpenAPI](openapi.json)。50个HTTP操作、48个Schema覆盖注册申请与独立审批、统一登录、版本画像、异步任务及恢复、证据、反馈、招生单位与个人授权。新规范整体采用snake_case和request_id；旧v0.1成功DTO不可直接使用。
 
-[共享 OpenAPI](../../../docs/contracts/openapi.json)由本前端的 `scripts/contract.mjs` 生成，同时生成本目录的兼容副本；执行 `pnpm run contract:check` 检查一致性。
-
-当前约定描述已实现的前端接口，并非完整后端实现。目标规范与差距见[技术方案](../../../docs/技术方案.md)第十二至十四章。
+运行 `pnpm run contract` 同时生成两份相同OpenAPI；`pnpm run contract:check`无写入地检查产物一致性。迁移说明见[技术方案对齐记录](TECHNICAL-ALIGNMENT.md)。本仓库没有真实后端，生产联调尚待双方完成。
