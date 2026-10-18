@@ -1,0 +1,1057 @@
+/* Night Voyage v0.2 — unobstructed navigation, art and an immersive atlas. */
+.drawer-layout .main-shell {
+  margin-left: 0;
+}
+.drawer-layout main {
+  max-width: 1580px;
+  padding-left: 52px;
+  padding-right: 52px;
+}
+.drawer-layout .topbar {
+  padding-left: 92px;
+  padding-right: 40px;
+}
+.global-menu {
+  position: fixed;
+  top: 18px;
+  left: 25px;
+  z-index: 47;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #d9c18b2c;
+  border-radius: 9px;
+  background: #172130c9;
+  color: #d9c18b;
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(14px);
+}
+.global-menu:hover,
+.global-menu.is-open {
+  color: #f8e6bc;
+  border-color: #d9c18b66;
+  background: #273244;
+}
+.drawer-layout .sidebar {
+  width: 282px;
+  padding: 85px 25px 0;
+  transform: translateX(-105%) scale(0.985);
+  opacity: 0;
+  transform-origin: left center;
+  visibility: hidden;
+  transition:
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.26s ease,
+    visibility 0s linear 0.42s;
+  background: #111b2af5;
+  backdrop-filter: blur(24px);
+  z-index: 46;
+  box-shadow: 18px 0 70px #0003;
+}
+.drawer-layout .sidebar.open {
+  transform: translateX(0) scale(1);
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.drawer-layout .nav-scrim {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: #070e1a66;
+  z-index: 44;
+  backdrop-filter: blur(3px);
+  cursor: default;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.3s ease,
+    visibility 0s linear 0.42s;
+}
+.drawer-layout .nav-scrim.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+.drawer-layout .sidebar nav > button {
+  opacity: 0;
+  transform: translateX(-12px);
+  transition:
+    transform 0.32s ease,
+    opacity 0.25s ease,
+    background 0.18s,
+    color 0.18s;
+}
+.drawer-layout .sidebar.open nav > button {
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: 0.07s;
+}
+.drawer-layout .sidebar-caption {
+  margin: 22px 10px 30px;
+}
+.drawer-layout .sidebar-bottom {
+  padding-top: 25px;
+}
+.drawer-layout .skip-link {
+  left: 80px;
+}
+.drawer-layout .navigator-launch {
+  bottom: 25px;
+}
+.drawer-layout footer {
+  padding-bottom: 20px;
+}
+.drawer-layout .hero {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  min-height: 540px;
+  gap: 5px;
+  padding-top: 40px;
+  padding-bottom: 27px;
+  align-items: center;
+}
+.drawer-layout .hero-copy {
+  padding-top: 0;
+  max-width: 560px;
+}
+.drawer-layout .hero h1 {
+  font-size: clamp(30px, 3.1vw, 46px);
+}
+.voyage-figure {
+  width: 100%;
+  margin: 0;
+  min-width: 0;
+  align-self: center;
+}
+.voyage-scene {
+  width: 100%;
+  aspect-ratio: 1000/660;
+  position: relative;
+  isolation: isolate;
+  max-width: 880px;
+  margin: auto;
+  background: radial-gradient(ellipse at 60% 55%, #c7ac6e07, transparent 65%);
+}
+.scene-coordinate {
+  position: absolute;
+  left: 7%;
+  top: 7%;
+  font:
+    8px Georgia,
+    serif;
+  letter-spacing: 3px;
+  color: #b0a78b80;
+}
+.scene-night-stars {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(1px 1px at 25% 20%, #d6c08a 40%, transparent),
+    radial-gradient(1px 1px at 70% 10%, #c0bcae 40%, transparent),
+    radial-gradient(1px 1px at 80% 60%, #b2b0a6 40%, transparent);
+  background-size:
+    180px 160px,
+    230px 270px,
+    157px 200px;
+  pointer-events: none;
+}
+.scene-sea {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: #dfc28b;
+  stroke-width: 0.75;
+  opacity: 0.16;
+  pointer-events: none;
+}
+.lighthouse-art {
+  position: absolute;
+  right: -1%;
+  top: 1%;
+  width: 32%;
+  aspect-ratio: 2/3;
+  z-index: 2;
+}
+.lighthouse-art > img,
+.voyager-motion > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+.lantern-origin {
+  position: absolute;
+  left: 51%;
+  top: 16%;
+  width: 1px;
+  height: 1px;
+  box-shadow: 0 0 24px 12px #edc7751a;
+}
+.lighthouse-light {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  pointer-events: none;
+  animation: light-breathe 5s ease-in-out infinite;
+}
+.voyager-art {
+  position: absolute;
+  width: 78%;
+  left: -2%;
+  bottom: 8%;
+  aspect-ratio: 3/2;
+  z-index: 3;
+}
+.voyager-motion {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 80%;
+  animation: voyager-drift 8s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes voyager-drift {
+  0%,
+  100% {
+    transform: translate(-3px, 2px) rotate(-0.45deg);
+  }
+  25% {
+    transform: translate(2px, -4px) rotate(0.35deg);
+  }
+  50% {
+    transform: translate(5px, 1px) rotate(0.65deg);
+  }
+  75% {
+    transform: translate(-1px, 5px) rotate(-0.2deg);
+  }
+}
+.chart-hotspot {
+  position: absolute;
+  left: 46%;
+  top: 29%;
+  width: 29%;
+  height: 30%;
+  border: 0;
+  border-radius: 8px;
+  transform: rotate(4deg);
+  color: #fff0c7;
+  cursor: zoom-in;
+  background: radial-gradient(ellipse, #ffdf8d12, transparent 70%);
+  z-index: 5;
+}
+.chart-hotspot:hover,
+.chart-hotspot:focus-visible {
+  background: radial-gradient(ellipse, #ffe8af50, transparent 75%);
+  outline: 1px solid #ffeac066;
+  outline-offset: 2px;
+  box-shadow: 0 0 34px #e3bb661a;
+}
+.chart-shimmer {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(ellipse, #ffdf8d18, transparent 70%);
+  pointer-events: none;
+}
+.chart-crosshair {
+  display: block;
+  color: #fff4d1;
+  font-size: 22px;
+  opacity: 0;
+  text-shadow: 0 0 15px #ffdc85;
+  transition: opacity 0.2s;
+}
+.chart-hotspot:hover .chart-crosshair,
+.chart-hotspot:focus-visible .chart-crosshair {
+  opacity: 0.95;
+}
+.chart-invitation {
+  position: absolute;
+  left: 15%;
+  bottom: 0;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 10px;
+  color: #bfb193;
+  z-index: 5;
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+.invitation-line {
+  width: 27px;
+  height: 1px;
+  background: #d7ba7c66;
+}
+.voyage-figure figcaption {
+  margin-top: 18px;
+  text-align: center;
+  font:
+    11px/1.8 "Noto Serif SC",
+    SimSun,
+    serif;
+  letter-spacing: 3px;
+  color: #9e9b8b;
+}
+.voyage-transition {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 100;
+  background: #101a2b;
+  pointer-events: all;
+}
+.voyage-camera {
+  will-change: transform, filter;
+  max-width: none !important;
+}
+.voyage-camera .chart-crosshair,
+.voyage-camera .chart-invitation,
+.voyage-camera .scene-coordinate {
+  opacity: 0;
+}
+@keyframes light-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+/* Small, localized gold halos; proximity is updated once per animation frame. */
+.drawer-layout .star-glow {
+  position: relative;
+  color: #d9c492;
+  border-color: #d9c49288;
+  box-shadow: 0 0 10px #d1b27333;
+  overflow: visible;
+  isolation: isolate;
+}
+.drawer-layout .star-glow:before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 95px;
+  height: 95px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #fff1be75 0,
+    #e0bd7340 15%,
+    #d3aa5118 34%,
+    transparent 68%
+  );
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+  z-index: -1;
+}
+.drawer-layout .star-map:hover .star-glow:before {
+  opacity: calc(0.18 + var(--proximity, 0) * 0.8);
+}
+.drawer-layout .star-node:hover .star-glow:before,
+.drawer-layout .star-node:focus-visible .star-glow:before {
+  opacity: 1;
+}
+.drawer-layout .star-node:focus-visible {
+  outline: 1px solid #d9c49288;
+  border-radius: 7px;
+}
+.map-tier {
+  font-size: 0.7em;
+  color: #c9b784;
+  opacity: 0.8;
+}
+.voyager-position {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 71px;
+  height: 102px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  padding: 0;
+  isolation: isolate;
+}
+.voyager-position > img {
+  width: 64px;
+  height: 90px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 14px #d8b77733);
+  pointer-events: none;
+  animation: map-boat-drift 7s ease-in-out infinite;
+}
+@keyframes map-boat-drift {
+  0%,
+  100% {
+    transform: translate(-1px, 1px) rotate(-1deg);
+  }
+  50% {
+    transform: translate(2px, -3px) rotate(1deg);
+  }
+}
+.boat-ripple {
+  position: absolute;
+  width: 100px;
+  height: 39px;
+  border: 1px solid #dfc28b24;
+  border-radius: 50%;
+  left: 50%;
+  top: 60%;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+  box-shadow:
+    0 0 0 13px #dfc28b04,
+    0 0 0 24px #dfc28b03;
+}
+.position-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #d6c192;
+  line-height: 1.8;
+  text-align: center;
+}
+.position-label > b {
+  font-size: 11px;
+  font-weight: 400;
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+.small .voyager-position {
+  width: 37px;
+  height: 50px;
+}
+.small .voyager-position > img {
+  width: 31px;
+  height: 46px;
+}
+.small .boat-ripple {
+  width: 50px;
+  height: 20px;
+  box-shadow: 0 0 0 8px #dfc28b04;
+}
+.small .position-label {
+  font-size: 7px;
+  top: 85%;
+  left: 100%;
+  transform: none;
+  text-align: left;
+}
+.small .position-label > b {
+  font-size: 8px;
+}
+/* The atlas is the page, rather than a card inside a page. */
+.atlas-page .topbar,
+.atlas-page .journey-progress,
+.atlas-page footer {
+  display: none;
+}
+.atlas-page main {
+  padding: 0;
+  max-width: none;
+  min-height: 100dvh;
+  outline: none;
+}
+.atlas-page .main-shell {
+  min-height: 100dvh;
+}
+.atlas-page .navigator-launch {
+  bottom: 24px;
+  right: 28px;
+}
+.atlas-shell {
+  height: 100dvh;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  background: #111b2a;
+}
+.atlas-shell .star-map.fullscreen {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse at 45% 65%, #62645116, transparent 65%),
+    radial-gradient(ellipse at 80% 20%, #a1804310, transparent 45%),
+    linear-gradient(135deg, #131d2d, #171f2c);
+}
+.atlas-shell .star-map.fullscreen .map-body {
+  position: absolute;
+  inset: 0;
+  height: auto;
+}
+.fullscreen .map-stars {
+  background-size:
+    180px 190px,
+    260px 290px,
+    260px 220px,
+    180px 240px,
+    370px 320px;
+  opacity: 0.65;
+}
+.fullscreen .map-lines {
+  opacity: 0.65;
+  stroke-width: 0.35;
+}
+.fullscreen .map-nodes {
+  inset: 105px 70px 130px;
+}
+.fullscreen .map-top {
+  position: absolute;
+  left: 32px;
+  top: 137px;
+  padding: 0;
+  font-size: 9px;
+  gap: 16px;
+  z-index: 3;
+  pointer-events: none;
+}
+.fullscreen .map-top > span:first-child {
+  display: none;
+}
+.fullscreen .map-top > span:last-child {
+  display: block;
+  max-width: none;
+  font-size: 9px;
+}
+.fullscreen .map-bottom {
+  position: absolute;
+  bottom: 65px;
+  left: 32px;
+  right: 32px;
+  border: 0;
+  padding: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+.fullscreen .map-bottom .zoom {
+  pointer-events: auto;
+  gap: 10px;
+}
+.fullscreen .zoom button {
+  border: 1px solid #d9c49222;
+  border-radius: 7px;
+  width: 35px;
+  height: 35px;
+  background: #1b2635bb;
+  display: grid;
+  place-items: center;
+  color: #cfc3a3;
+  backdrop-filter: blur(12px);
+}
+.fullscreen .legend {
+  font-size: 10px;
+  gap: 24px;
+}
+.fullscreen .map-axis {
+  bottom: 108px;
+  left: 32px;
+  right: 32px;
+  font-size: 9px;
+}
+.fullscreen .star-glow {
+  width: 23px;
+  height: 23px;
+}
+.fullscreen .star-glow > span {
+  width: 4px;
+  height: 4px;
+}
+.fullscreen .star-name {
+  font-size: 13px;
+  margin-left: 3px;
+}
+.fullscreen .star-name small {
+  font-size: 10px;
+  color: #9d9f9c;
+}
+.fullscreen .star-node {
+  padding: 15px;
+  gap: 10px;
+}
+.fullscreen .star-glow:before {
+  width: 120px;
+  height: 120px;
+}
+.atlas-heading {
+  position: absolute;
+  left: 89px;
+  top: 24px;
+  z-index: 8;
+  pointer-events: none;
+}
+.atlas-heading > .eyebrow {
+  font-size: 7px;
+  color: #9e957e;
+  letter-spacing: 2px;
+}
+.atlas-heading h1 {
+  font-size: 24px;
+  font-weight: 500;
+  color: #e5d8b9;
+  line-height: 1.7;
+  margin-top: 3px;
+}
+.atlas-heading p {
+  font-size: 10px;
+  color: #939eae;
+  line-height: 1.8;
+  margin-top: 13px;
+}
+.atlas-filter-toggle {
+  position: absolute;
+  right: 28px;
+  top: 24px;
+  z-index: 12;
+  padding: 11px 15px;
+  background: #202b3bbb;
+  border: 1px solid #cdb78433;
+  border-radius: 8px;
+  backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: #d7c69e;
+}
+.atlas-filter-toggle small {
+  font-size: 9px;
+  color: #97a0ab;
+  border-left: 1px solid #ffffff18;
+  padding-left: 10px;
+}
+.atlas-filters {
+  position: absolute;
+  right: 28px;
+  top: 79px;
+  width: 365px;
+  max-width: calc(100% - 32px);
+  padding: 20px;
+  border: 1px solid #cdb78433;
+  border-radius: 12px;
+  background: #1c283aee;
+  backdrop-filter: blur(22px);
+  z-index: 12;
+  box-shadow: 0 20px 60px #0004;
+}
+.atlas-filter-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+.atlas-filter-heading h2 {
+  font-size: 17px;
+  font-weight: 500;
+  color: #e0d5bb;
+}
+.atlas-filters .search {
+  max-width: none;
+  width: 100%;
+  font-size: 11px;
+  margin-bottom: 15px;
+}
+.atlas-filters .search input {
+  padding: 11px 0;
+}
+.atlas-filter-row {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-top: 13px;
+}
+.atlas-filter-row select {
+  width: 50%;
+  font-size: 10px;
+  padding: 11px 8px;
+}
+.atlas-filters > p {
+  font-size: 9px;
+  color: #8a98ad;
+  margin-top: 17px;
+  line-height: 1.9;
+}
+.atlas-selection {
+  position: absolute;
+  right: 28px;
+  bottom: 130px;
+  width: 330px;
+  max-width: calc(100% - 32px);
+  z-index: 11;
+  box-shadow: 0 15px 60px #0005;
+  background: #182436f2;
+  border-radius: 8px;
+  backdrop-filter: blur(18px);
+}
+.atlas-selection .school-card {
+  padding-top: 37px;
+  background: transparent;
+}
+.selection-close {
+  position: absolute;
+  right: 8px;
+  top: 5px;
+  z-index: 2;
+}
+.atlas-disclaimer {
+  position: absolute;
+  bottom: 27px;
+  left: 32px;
+  font-size: 9px;
+  color: #8d98a9;
+  z-index: 8;
+  max-width: calc(100% - 240px);
+  line-height: 1.7;
+  pointer-events: none;
+}
+.atlas-empty {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -30%);
+  z-index: 7;
+  background: #172235e8;
+  border: 1px solid #cdb78422;
+  border-radius: 10px;
+  width: 380px;
+  max-width: calc(100% - 32px);
+}
+.atlas-list-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 175px 52px 110px;
+}
+.atlas-list-mode {
+  background:
+    radial-gradient(ellipse at 60% 20%, #3c44504a, transparent 65%), #121d2d;
+}
+@media (min-width: 1600px) {
+  .drawer-layout main {
+    padding-left: 65px;
+    padding-right: 65px;
+  }
+  .drawer-layout .hero {
+    min-height: 610px;
+  }
+  .drawer-layout .hero h1 {
+    font-size: 49px;
+  }
+}
+@media (max-width: 1100px) {
+  .drawer-layout main {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+  .drawer-layout .hero {
+    min-height: 450px;
+    grid-template-columns: 1fr 1.1fr;
+  }
+  .drawer-layout .hero h1 {
+    font-size: 32px;
+  }
+  .chart-invitation {
+    font-size: 8px;
+    gap: 5px;
+  }
+  .voyage-figure figcaption {
+    font-size: 9px;
+  }
+  .drawer-layout .hero-copy > .eyebrow {
+    font-size: 7px;
+  }
+}
+@media (max-width: 760px) {
+  .drawer-layout .sidebar {
+    width: 282px;
+  }
+  .drawer-layout main {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+  .global-menu {
+    left: 17px;
+    top: 12px;
+    width: 37px;
+    height: 37px;
+  }
+  .drawer-layout .topbar {
+    padding-left: 71px;
+    padding-right: 18px;
+  }
+  .drawer-layout .hero {
+    grid-template-columns: 1fr;
+    padding-top: 38px;
+    gap: 14px;
+  }
+  .drawer-layout .hero-copy {
+    max-width: none;
+  }
+  .drawer-layout .hero h1 {
+    font-size: 32px;
+  }
+  .voyage-figure {
+    max-width: 620px;
+    margin: 0 auto;
+  }
+  .voyage-scene {
+    aspect-ratio: 1000/660;
+  }
+  .chart-invitation {
+    font-size: 9px;
+    bottom: 1%;
+  }
+  .voyage-figure figcaption {
+    margin-top: 11px;
+  }
+  .drawer-layout .navigator-launch {
+    bottom: 20px;
+  }
+  .drawer-layout footer {
+    padding-bottom: 80px;
+  }
+  .drawer-layout .home-columns {
+    margin-top: 26px;
+  }
+  .atlas-page main {
+    padding: 0;
+  }
+  .atlas-heading {
+    left: 73px;
+    top: 13px;
+  }
+  .atlas-heading > .eyebrow {
+    font-size: 6px;
+  }
+  .atlas-heading h1 {
+    font-size: 21px;
+  }
+  .atlas-heading p {
+    margin-top: 18px;
+    font-size: 9px;
+    max-width: 280px;
+    transform: translateX(-51px);
+  }
+  .atlas-heading p > span {
+    display: none;
+  }
+  .atlas-filter-toggle {
+    right: 16px;
+    top: 14px;
+    padding: 10px;
+    gap: 6px;
+    font-size: 10px;
+  }
+  .atlas-filter-toggle small {
+    display: none;
+  }
+  .atlas-filters {
+    right: 16px;
+    top: 65px;
+    width: 340px;
+  }
+  .fullscreen .map-nodes {
+    inset: 140px 13px 175px;
+  }
+  .fullscreen .map-top {
+    left: 22px;
+    top: 112px;
+    font-size: 8px;
+  }
+  .fullscreen .map-top > span:last-child {
+    font-size: 8px;
+  }
+  .fullscreen .star-node {
+    gap: 5px;
+    padding: 10px;
+  }
+  .fullscreen .star-glow {
+    width: 16px;
+    height: 16px;
+  }
+  .fullscreen .star-name {
+    font-size: 9px;
+    margin-left: 0;
+  }
+  .fullscreen .star-name small {
+    font-size: 8px;
+  }
+  .fullscreen .map-axis {
+    left: 22px;
+    right: 22px;
+    bottom: 150px;
+    font-size: 8px;
+  }
+  .fullscreen .map-axis > span {
+    display: none;
+  }
+  .fullscreen .map-bottom {
+    left: 22px;
+    right: 22px;
+    bottom: 104px;
+  }
+  .fullscreen .legend {
+    font-size: 8px;
+    gap: 11px;
+  }
+  .fullscreen .zoom {
+    gap: 6px !important;
+  }
+  .fullscreen .zoom button {
+    width: 30px;
+    height: 30px;
+  }
+  .atlas-disclaimer {
+    left: 22px;
+    bottom: 33px;
+    max-width: calc(100% - 175px);
+    font-size: 7px;
+  }
+  .atlas-page .navigator-launch {
+    bottom: 25px;
+    right: 16px;
+  }
+  .atlas-selection {
+    right: 16px;
+    bottom: 150px;
+    width: 310px;
+  }
+  .voyager-position {
+    width: 56px;
+    height: 80px;
+  }
+  .voyager-position > img {
+    width: 49px;
+    height: 70px;
+  }
+  .position-label {
+    font-size: 8px;
+  }
+  .position-label > b {
+    font-size: 9px;
+  }
+  .atlas-list-scroll {
+    padding: 155px 22px 120px;
+  }
+  .atlas-shell {
+    min-height: 0;
+  }
+}
+@media (max-width: 460px) {
+  .drawer-layout main {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .drawer-layout .hero h1 {
+    font-size: 29px;
+  }
+  .drawer-layout .hero-copy > .eyebrow {
+    font-size: 6.5px;
+  }
+  .chart-invitation {
+    font-size: 7px;
+    letter-spacing: 0.5px;
+    left: 10%;
+  }
+  .voyage-figure figcaption {
+    font-size: 9px;
+    letter-spacing: 2px;
+  }
+  .voyage-figure {
+    margin-top: 3px;
+  }
+  .atlas-page main {
+    padding: 0;
+  }
+  .fullscreen .star-name {
+    font-size: 8px;
+  }
+  .fullscreen .star-name small {
+    display: none;
+  }
+  .fullscreen .map-nodes {
+    left: 4px;
+    right: 4px;
+  }
+  .fullscreen .map-top {
+    top: 110px;
+  }
+  .drawer-layout .top-actions {
+    gap: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lighthouse-light {
+    animation: none;
+  }
+  .drawer-layout .sidebar,
+  .chart-crosshair,
+  .drawer-layout .star-glow:before {
+    transition: none;
+  }
+}
+@media print {
+  .global-menu,
+  .voyage-figure,
+  .atlas-filter-toggle {
+    display: none;
+  }
+  .drawer-layout .sidebar,
+  .drawer-layout .nav-scrim {
+    display: none;
+  }
+  .drawer-layout main {
+    padding: 0;
+  }
+}
+@media (max-width: 760px) {
+  .atlas-shell .star-map.fullscreen .star-name {
+    font-size: 10px;
+  }
+}
+@media (max-height: 600px) {
+  .atlas-heading p,
+  .fullscreen .map-top {
+    display: none;
+  }
+  .fullscreen .map-nodes {
+    top: 75px;
+    bottom: 115px;
+  }
+  .fullscreen .map-axis {
+    bottom: 94px;
+  }
+  .fullscreen .map-bottom {
+    bottom: 52px;
+  }
+  .fullscreen .voyager-position {
+    height: 62px;
+  }
+  .fullscreen .voyager-position > img {
+    height: 55px;
+  }
+  .atlas-disclaimer {
+    bottom: 16px;
+  }
+}
