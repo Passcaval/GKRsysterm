@@ -4,9 +4,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 CONTRACT = json.loads(
-    (Path(__file__).resolve().parents[3] / "docs/contracts/openapi.json").read_text(
-        encoding="utf-8"
-    )
+    (Path(__file__).resolve().parent / "fixtures/v01-openapi.json").read_text(encoding="utf-8")
 )
 
 

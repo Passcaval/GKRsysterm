@@ -312,7 +312,7 @@ const schemas = {
   RegistrationReceipt: obj({
     application_id: id,
     reserved_user_id: id,
-    status: { type: "string", const: "pending" },
+    status: en(["pending", "approved", "rejected"]),
     status_token: str({ minLength: 16 }),
   }),
   RegistrationStatus: obj(applicationFields, [
@@ -349,6 +349,7 @@ const schemas = {
       school_name: str(),
       campus_id: nullable(str()),
       major: str(),
+      major_id: str(),
       eligibility: obj({
         status: en(["pass", "fail", "unknown"]),
         missing_requirements: strings,

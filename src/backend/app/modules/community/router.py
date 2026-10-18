@@ -132,11 +132,13 @@ async def apply(
     form = await request.form(max_files=1, max_fields=5, max_part_size=12000)
     allowed = {"nickname", "email", "password", "evidence_text", "evidence_audio"}
     if set(form) - allowed or len(form.multi_items()) != len(form):
+        await form.close()
         raise DomainError(422, "INVALID_INPUT", "申请包含未允许或重复的字段。")
     upload = form.get("evidence_audio")
     try:
         data = Registration.model_validate({k: v for k, v in form.items() if k != "evidence_audio"})
     except ValidationError as exc:
+        await form.close()
         raise RequestValidationError(exc.errors()) from None
     stored = None
     audio_info = None

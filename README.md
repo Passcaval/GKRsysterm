@@ -24,11 +24,11 @@ pnpm run dev
 
 ## 后端：M0–M1
 
-真实后端位于 [`src/backend`](src/backend)，使用 FastAPI、SQLAlchemy、Alembic 和 PostgreSQL 17。提供注册审批、统一登录、画像版本、官方资料导入、规则推荐与反馈；现有前端17项操作通过兼容接口对接。
+真实后端位于 [`src/backend`](src/backend)，使用 FastAPI、SQLAlchemy、Alembic 和 PostgreSQL 17。已整合同事 v0.4 前端，提供注册审批、统一登录与权限隔离、画像版本、官方资料导入、异步规则推荐、反馈及志愿草案。50 项共享接口的实际支持范围见后端说明，后续阶段功能返回明确的未开放状态。
 
 没有本机 PostgreSQL 可使用随项目提供的 Docker Compose，数据库仅绑定 `127.0.0.1:55432`，与其他容器分开保存。按[后端启动与测试说明](src/backend/README.md)初始化数据库和管理员，并分别启动 API、Worker；前端设置 `VITE_API_MODE=http` 后启动。默认前端仍是演示模式。
 
 - [后端实际接口、数据字典和前端差异](docs/contracts/BACKEND.md)
 - [生成的完整后端 OpenAPI](docs/contracts/backend-openapi.json)
 
-真实 PostgreSQL、并发事务和前端访问层联调已验证；测试使用合成资料。未预装真实招生数据，模型、向量检索及 M2–M4 不在本阶段范围；注册审批等新增业务目前提供 API，完整前端页面仍待补齐。
+真实 PostgreSQL、并发事务、当前 v0.4 前端访问层及浏览器登录权限已联调；测试使用合成资料。注册申请、审批、画像和推荐工作流已有页面。未预装真实招生数据；模型、向量检索、学校认证审核、长期记忆和案例共享等 M2–M4 功能未完成，不能用演示模式的效果作为真实后端能力。

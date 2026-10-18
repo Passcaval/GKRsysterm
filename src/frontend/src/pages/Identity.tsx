@@ -249,7 +249,7 @@ export function Registration() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    const errors = validateRegistration(input);
+    const errors = isMock ? validateRegistration(input) : [];
     if (errors.length) {
       setError(errors.join("；"));
       return;
@@ -339,7 +339,8 @@ export function Registration() {
               邮箱
               <input
                 required
-                type="email"
+                type="text"
+                inputMode="email"
                 value={input.email}
                 onChange={(e) =>
                   setInput((p) => ({ ...p, email: e.target.value }))

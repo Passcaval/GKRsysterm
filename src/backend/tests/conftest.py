@@ -58,7 +58,7 @@ def app(database_url, tmp_path):
         auth_rate_limit=10000,
         registration_rate_limit=10000,
     )
-    application = create_app(settings)
+    application = create_app(settings, contract_version="0.1")
     with application.state.sessions.begin() as db:
         create_admin(db, "管理员", "admin@example.test", PASSWORD)
     yield application

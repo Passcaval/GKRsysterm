@@ -227,6 +227,7 @@ export interface RunQuestion {
   required: boolean;
 }
 export interface RecommendationItem {
+  majorId?: string;
   recommendationItemId: string;
   admissionUnitId: string;
   schoolId: string;

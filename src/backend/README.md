@@ -2,7 +2,7 @@
 
 Python 3.12、FastAPI、Pydantic、SQLAlchemy 2、psycopg 3、Alembic、PostgreSQL 17。认证使用 Argon2id 和服务端 Cookie 会话；数据库持久任务由独立 Worker 消费。源码按 `app/modules/` 业务模块组织，API 与 Worker 共用规则、版本数据和结果校验。依赖精确版本见 `requirements.lock`。
 
-本阶段覆盖浙江 2026 普通类按专业招生的规则辅助查询。没有预装真实招生数据，不连接模型，不计算录取概率。详细实现、接口差异和后续页面工作见 [共享后端说明](../../docs/contracts/BACKEND.md)。
+本阶段覆盖浙江 2026 普通类按专业招生的规则辅助查询，已整合前端 v0.4 的注册审批、画像、异步推荐与反馈工作流。没有预装真实招生数据，不连接模型，不计算录取概率。详细实现、50 项共享接口的支持范围及阶段限制见 [共享后端说明](../../docs/contracts/BACKEND.md)。
 
 ## 本机没有 PostgreSQL 时
 
@@ -45,7 +45,7 @@ pnpm run dev
 
 访问 `http://127.0.0.1:5173/#/login`，使用刚创建的真实账号。Vite 已将 `/api` 代理到本机 8000；无需改登录页。匿名时院校列表为空是正常情况，管理员复核并导入真实官方资料后才出现数据。统一登录页不显示角色，服务端返回权限决定进入个人区或管理区。前端原有演示账号仅在 Mock 模式有效。
 
-改用其他前端端口时同步 `.env` 的 ALLOWED_ORIGINS，并重启 API。浏览器与 API 应使用同一主机名；开发阶段优先通过 Vite 代理。正式构建也要显式设置 `VITE_API_MODE=http`，否则仍是演示模式。线上同源反向代理 `/api`、启用 HTTPS 与 `COOKIE_SECURE=true`、`APP_ENV=production`，SSE 关闭代理缓冲。
+改用其他前端端口时同步 `.env` 的 ALLOWED_ORIGINS，并重启 API。浏览器与 API 应使用同一主机名；开发阶段优先通过 Vite 代理。当前前端开发默认 Mock，生产构建默认 HTTP；建议部署时显式设置 `VITE_API_MODE=http`。standalone 始终为演示模式。线上同源反向代理 `/api`、启用 HTTPS 与 `COOKIE_SECURE=true`、`APP_ENV=production`，SSE 关闭代理缓冲。
 
 ## 自动验证
 
@@ -61,15 +61,16 @@ $env:NV_LIVE_FRONTEND = '1'
 .venv/Scripts/python.exe -m pytest -q
 ```
 
-未设置 TEST_DATABASE_URL 时自动沿用本地连接参数、只把库名改为 `night_voyage_test`。共享数据库环境必须显式指定专用测试库，不能对开发数据运行回退或测试。完整测试需要 Node.js 和前端锁文件依赖；不设置 NV_LIVE_FRONTEND 时只跳过真实前端适配器测试。该测试启动临时 Uvicorn，调用实际 `src/frontend/src/api.ts`，最后停止临时服务；其账号和招生数据均为合成测试材料。
+未设置 TEST_DATABASE_URL 时自动沿用本地连接参数、只把库名改为 `night_voyage_test`。共享数据库环境必须显式指定专用测试库，不能对开发数据运行回退或测试。完整测试需要 Node.js、前端锁文件依赖和 PATH 中的 ffmpeg/ffprobe；不设置 NV_LIVE_FRONTEND 时只跳过真实前端适配器测试。该测试启动临时 Uvicorn 和 Worker，调用当前 v0.4 的实际 `src/frontend/src/api.ts`，最后停止临时服务；其账号和招生数据均为合成测试材料。
 
-Windows 若切换执行账户后遇到临时目录权限错误，可用自己拥有的、新建且未使用的目录作为 pytest `--basetemp`，并用 `-p no:cacheprovider` 避免旧缓存权限。pytest 会清理指定临时目录，不能指向已有业务文件。2026-10-18 基线验证：完整 49 项、前端 18 项、迁移往返与元数据检查通过；详情见[开发日志](../../docs/开发日志.md)。有一个 Starlette 对 TestClient 的 httpx 弃用提示，不影响当前测试。
+Windows 若切换执行账户后遇到临时目录权限错误，可用自己拥有的、新建且未使用的目录作为 pytest `--basetemp`，并用 `-p no:cacheprovider` 避免旧缓存权限。pytest 会清理指定临时目录，不能指向已有业务文件。最新整合验证结果见[开发日志](../../docs/开发日志.md)。有一个 Starlette 对 TestClient 的 httpx 弃用提示，不影响当前测试。
 
 Linux/CI 使用 `.venv/bin/python` 或激活后的 `python`；GitHub Actions 已配置 PostgreSQL 服务、迁移、契约、测试及真实适配器联调。
 
 ## 数据与维护
 
-- 注册音频仅接受完整 PCM WAV，最多 120 秒、10 MiB；不依赖模型转写。学校认证附件接受有效 PNG、JPEG 或未加密、最多 20 页 PDF，最多 10 MiB。仅上传不表示认证通过。
+- 注册音频支持完整 PCM WAV 和浏览器常见 WebM/OGG/MP3/M4A，最多 120 秒、10 MiB；按文件实际内容检查，保留原始录音，不依赖模型转写。非 WAV 需要 PATH 中的 ffmpeg 和 ffprobe，缺失返回 503；解析限定管道输入、超时和解码长度，不允许外部协议读取。部署前确认两个工具可用，Linux CI 已安装；本机沿用已有安装。
+- 学校认证附件接受有效 PNG、JPEG 或未加密、最多 20 页 PDF，最多 10 MiB。当前只支持私有上传待审；M2 认证审核尚未开放，上传不会授予认证权限。
 - 文件保存在 `runtime/private`，不设置静态公开路由。终态注册材料保留默认 30 天；运行 `.venv/Scripts/python.exe -m app.cli cleanup` 清除过期材料、过期会话与限流窗口。待审申请不因超时自动释放占用。部署时安排日常清理任务并限制运行目录的操作系统访问权限。
 - 备份需同时覆盖 PostgreSQL 和私有文件；本阶段尚未执行生产备份恢复演练。意外断电在文件入库前可留下孤立文件，尚未实现自动孤立文件清理。
 - 修改模型后新增 Alembic 迁移；已共享迁移不要改写。运行 `python -m scripts.export_openapi` 更新后端契约，前端兼容契约由前端 `pnpm run contract` 生成。双方契约和测试随同一 PR 提交。

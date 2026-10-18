@@ -17,7 +17,7 @@ class LegacyRecommendation(StrictModel):
 
 
 class RunInput(StrictModel):
-    question: str = Field(min_length=1, max_length=3000)
+    question: str = Field(min_length=1, max_length=4000)
     profile_version_id: UUID | None = None
 
 
@@ -27,6 +27,8 @@ class AnswerInput(StrictModel):
 
 
 def emit(db, run, kind, payload):
+    if kind == "result":
+        payload = {**payload, "validated": payload.get("validation", {}).get("status") == "pass"}
     run.event_seq += 1
     db.add(RunEvent(run_id=run.id, event_id=run.event_seq, event_type=kind, payload=payload))
 
@@ -34,17 +36,30 @@ def emit(db, run, kind, payload):
 def rules(profile, unit):
     data = unit
     failures, unknown = [], []
-    if profile["province"] != data["province_code"] or profile["year"] != data["exam_year"]:
+    if not profile.get("province"):
+        unknown.append("省份待确认")
+    elif profile["province"] != data["province_code"] or profile["year"] != data["exam_year"]:
         failures.append("省份或招生年份不在该招生单位范围")
+    if profile.get("exam_category", "普通类") != data["exam_category"]:
+        failures.append("招生科类不匹配")
     required = data["required_subjects"]
     if required is None:
         unknown.append("官方选科要求待确认")
+    elif len(profile["subjects"]) != 3:
+        unknown.append("选科尚未完整确认")
     elif not set(required).issubset(profile["subjects"]):
         failures.append("选科不满足官方要求")
     if data["tuition"] is None:
         unknown.append("学费待确认")
+    elif profile["budget"] is None:
+        unknown.append("学费预算待确认")
     elif data["tuition"] > profile["budget"]:
         failures.append("学费超过已确认的年度学费预算上限")
+    if profile.get("budget_scope") == "total":
+        unknown.append("总预算还需核对住宿及生活费用")
+    for preference in profile.get("preferences", []):
+        if preference["strength"] == "hard":
+            unknown.append("硬性偏好需人工核对：" + preference["field"] + "=" + preference["value"])
     if not data["campus"]:
         unknown.append("校区待确认")
     if not profile.get("batch") or profile["batch"] != data["batch"]:
@@ -55,7 +70,10 @@ def rules(profile, unit):
     history = [
         h
         for h in data["history"]
-        if h["comparable"] and cohort and h["rank_cohort"] == cohort == data["rank_cohort"]
+        if h["comparable"]
+        and cohort
+        and profile.get("rank")
+        and h["rank_cohort"] == cohort == data["rank_cohort"]
     ]
     risk = {"status": "unknown", "reason": "暂无经确认的同口径可比历史；不计算录取概率"}
     if history:

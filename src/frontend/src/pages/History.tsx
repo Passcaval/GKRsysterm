@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import { api, isMock } from "../api";
 import { useApp } from "../store";
 import { PageTitle, Empty } from "../components";
 import type { HistoryEntry, PersonalMemory } from "../types";
@@ -46,6 +46,13 @@ export default function History() {
         title="航行历史与偏好"
         description="历史任务可以恢复。个人画像用途授权与跨用户案例共享授权相互独立，默认不共享。"
       />
+      {!isMock && (
+        <div className="notice amber">
+          <p>
+            当前版本支持推荐历史。偏好记忆与跨用户案例共享尚未开放，你的数据不会用于跨用户共享。
+          </p>
+        </div>
+      )}
       {error && (
         <div className="notice amber" role="alert">
           <p>{error}</p>
@@ -140,7 +147,7 @@ export default function History() {
           <input
             type="checkbox"
             checked={sharing}
-            disabled={busy}
+            disabled={busy || !isMock}
             onChange={async (e) => {
               const enabled = e.target.checked;
               setBusy(true);

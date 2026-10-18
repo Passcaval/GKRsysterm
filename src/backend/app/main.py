@@ -42,9 +42,9 @@ class BodyLimit:
                         "error": {
                             "code": "FILE_TOO_LARGE",
                             "message": "请求体过大，请缩小附件。",
-                            "details": [],
+                            "details": {},
                         },
-                        "requestId": str(uuid4()),
+                        "request_id": str(uuid4()),
                     },
                 )
                 return await response(scope, receive, send)
@@ -63,7 +63,7 @@ class BodyLimit:
         await self.app(scope, replay, send)
 
 
-def create_app(settings: Settings | None = None):
+def create_app(settings: Settings | None = None, *, contract_version="0.4"):
     settings = settings or Settings()
 
     @asynccontextmanager
@@ -73,6 +73,7 @@ def create_app(settings: Settings | None = None):
 
     app = FastAPI(title="Night Voyage M0–M1", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
+    app.state.contract_version = contract_version
     configure_db(app, settings)
     app.add_middleware(BodyLimit)
     app.add_middleware(
@@ -123,7 +124,20 @@ def create_app(settings: Settings | None = None):
             )
         return result(request, {"status": "ok", "database": "postgresql", "stage": "M0-M1"})
 
-    for router in (accounts, profiles, admissions, content, recommendations, history, agent):
-        app.include_router(router)
-    install_contract(app)
+    if contract_version == "0.1":
+        # Isolated regression harness for core service invariants; never the default deployment.
+        for router in (accounts, profiles, admissions, content, recommendations, history, agent):
+            app.include_router(router)
+    else:
+        from app.modules.protocol.router import router as protocol
+
+        app.include_router(protocol)
+        # Import endpoints are backend-only and unchanged by the frontend migration.
+        for route in admissions.routes:
+            if route.path.startswith("/api/v1/admin/imports"):
+                app.router.routes.append(route)
+        for route in history.routes:
+            if route.path == "/api/v1/admin/feedback":
+                app.router.routes.append(route)
+        install_contract(app)
     return app

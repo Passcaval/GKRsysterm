@@ -33,7 +33,14 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
     def stream():
         for event in (
             {"type": "error", "text": "M0–M1 尚未接入模型对话，请使用画像和规则推荐功能。"},
-            {"type": "done", "conversationId": str(conversation.id)},
+            {
+                "type": "done",
+                (
+                    "conversation_id"
+                    if getattr(request.app.state, "contract_version", "0.4") == "0.4"
+                    else "conversationId"
+                ): str(conversation.id),
+            },
         ):
             yield "data: " + json.dumps(event, ensure_ascii=False) + "\n\n"
 

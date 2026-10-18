@@ -17,7 +17,7 @@ class Login(StrictModel):
 class Registration(StrictModel):
     nickname: str
     email: str
-    password: str = Field(min_length=8, max_length=256)
+    password: str = Field(min_length=8, max_length=128)
     evidence_text: str | None = Field(default=None, max_length=3000)
 
 

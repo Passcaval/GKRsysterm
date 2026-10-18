@@ -16,9 +16,13 @@ def validate_result(snapshot, result):
                 raise DomainError(422, "RESULT_REJECTED", "候选或来源与冻结数据不一致。")
             if group == "items" and (
                 item["eligibility"]["status"] != "pass"
+                or len(profile["subjects"]) != 3
+                or profile.get("budget_scope") == "total"
+                or any(p["strength"] == "hard" for p in profile.get("preferences", []))
                 or unit["required_subjects"] is None
                 or not set(unit["required_subjects"]).issubset(profile["subjects"])
                 or unit["tuition"] is None
+                or profile["budget"] is None
                 or unit["tuition"] > profile["budget"]
                 or not unit["campus"]
                 or unit["additional_requirements"]

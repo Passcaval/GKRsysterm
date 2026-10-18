@@ -49,16 +49,42 @@ try {
     (e) =>
       e instanceof ApiError &&
       e.status === 422 &&
+      e.requestId &&
       e.message.includes("请重新输入"),
   );
-  const user = await api.login(
-    "student@example.test",
-    "Test-only Strong Pass!",
+  const receipt = await api.register(
+    {
+      nickname: "新生",
+      email: "live@example.test",
+      password: "Test-only Strong Pass!",
+      evidenceText: "仅用于真实前后端联调的合成审核证据",
+      evidenceAudio: null,
+    },
+    "live-registration",
   );
+  assert.equal(
+    (await api.application(receipt.applicationId, receipt.statusToken)).status,
+    "pending",
+  );
+  await api.login("admin@example.test", "Test-only Strong Pass!");
+  assert.equal((await api.registrationQueue()).items.length, 1);
+  assert.equal(
+    (await api.applicationDetail(receipt.applicationId)).evidenceText,
+    "仅用于真实前后端联调的合成审核证据",
+  );
+  await api.decideRegistration(
+    receipt.applicationId,
+    "approve",
+    "合成证据人工测试",
+    1,
+    "live-approval",
+  );
+  await api.logout();
+  const user = await api.login("live@example.test", "Test-only Strong Pass!");
   assert.equal(user.role, "student");
   assert.equal((await api.bootstrap()).user.id, user.id);
   await assert.rejects(api.moderation(), (e) => e.status === 403);
-  await api.profile({
+  const profile = await api.profile({
     province: "浙江",
     year: 2026,
     score: 600,
@@ -69,11 +95,47 @@ try {
     budget: 10000,
     acceptAdjustment: true,
     consent: true,
+    rankCohort: "浙江普通类",
   });
-  const recommendations = await api.recommendations(50);
-  assert.equal(recommendations.length, 1);
-  assert.equal(recommendations[0].tier, "unknown");
-  assert.ok(recommendations[0].sourceIds.length);
+  let run = await api.createRun(
+    {
+      question: "查询合成测试专业",
+      profileVersionId: profile.profileVersionId,
+      riskPreference: 50,
+      intent: "risk",
+    },
+    "live-run",
+  );
+  assert.equal(run.status, "waiting_input");
+  run = await api.answerRun(
+    run.runId,
+    { batch: "普通类一段" },
+    run.version,
+    "live-answer",
+  );
+  for (
+    let i = 0;
+    i < 100 && !["succeeded", "failed"].includes(run.status);
+    i++
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    run = await api.getRun(run.runId);
+  }
+  assert.equal(run.status, "succeeded");
+  assert.equal(run.validation.status, "passed");
+  const item = run.items[0];
+  assert.equal(item.historicalRisk.status, "unknown");
+  assert.ok(item.evidenceIds.length);
+  await api.recommendationFeedback(
+    run.runId,
+    item.recommendationItemId,
+    "correction",
+    "仅用于集成测试的事实核对",
+    "live-feedback",
+  );
+  assert.equal((await api.history()).length, 1);
+  assert.equal((await api.admissionUnits(item.schoolId)).items.length, 1);
+  assert.equal((await api.source(item.evidenceIds[0])).kind, "official");
   const snapshot = await api.bootstrap();
   const school = snapshot.schools[0];
   assert.ok((await api.favorite(school.id, true)).includes(school.id));
@@ -83,7 +145,10 @@ try {
       {
         id: "live-entry",
         schoolId: school.id,
-        major: recommendations[0].major,
+        major: item.major,
+        majorId: item.majorId,
+        admissionUnitId: item.admissionUnitId,
+        recommendationItemId: item.recommendationItemId,
         adjustment: true,
       },
     ],
@@ -95,7 +160,7 @@ try {
     (await api.login("admin@example.test", "Test-only Strong Pass!")).role,
     "admin",
   );
-  assert.deepEqual(await api.moderation(), []);
+  assert.deepEqual((await api.moderation()).items, []);
   await api.logout();
   console.log("Real frontend adapter -> Uvicorn -> PostgreSQL smoke passed.");
 } finally {

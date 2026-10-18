@@ -1,4 +1,7 @@
 import io
+import json
+import shutil
+import subprocess
 import wave
 from pathlib import Path
 from uuid import uuid4
@@ -11,6 +14,10 @@ from app.core.errors import DomainError
 
 
 def validate_audio(content: bytes):
+    if len(content) < 16:
+        raise DomainError(415, "FILE_TYPE_UNSUPPORTED", "语音文件无效，请重新提交。")
+    if not content.startswith(b"RIFF"):
+        return validate_recorded_audio(content)
     try:
         with wave.open(io.BytesIO(content), "rb") as audio:
             duration = audio.getnframes() / audio.getframerate()
@@ -26,6 +33,87 @@ def validate_audio(content: bytes):
             415, "FILE_TYPE_UNSUPPORTED", "语音须为完整的 PCM WAV 音频，且不超过 120 秒。"
         ) from None
     return "audio/wav", duration
+
+
+def validate_recorded_audio(content):
+    # Decode through stdin with pipe-only protocols: no network or file references from media.
+    probe, decoder = shutil.which("ffprobe"), shutil.which("ffmpeg")
+    if not probe or not decoder:
+        raise DomainError(
+            503, "AUDIO_DECODER_UNAVAILABLE", "语音解析服务未就绪，请暂用 WAV 或文字证据。"
+        )
+    flags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+    options = {"input": content, "capture_output": True, "timeout": 15, "creationflags": flags}
+    try:
+        inspected = subprocess.run(
+            [
+                probe,
+                "-v",
+                "error",
+                "-protocol_whitelist",
+                "pipe",
+                "-show_format",
+                "-show_streams",
+                "-of",
+                "json",
+                "pipe:0",
+            ],
+            **options,
+        )
+        metadata = json.loads(inspected.stdout)
+        streams = metadata.get("streams", [])
+        if inspected.returncode or len(streams) != 1 or streams[0].get("codec_type") != "audio":
+            raise ValueError()
+        formats = set(metadata["format"]["format_name"].split(","))
+        mime = (
+            "audio/webm"
+            if "webm" in formats
+            else "audio/ogg"
+            if "ogg" in formats
+            else "audio/mpeg"
+            if "mp3" in formats
+            else "audio/mp4"
+            if "mp4" in formats
+            else None
+        )
+        if not mime:
+            raise ValueError()
+        decoded = subprocess.run(
+            [
+                decoder,
+                "-v",
+                "error",
+                "-xerror",
+                "-nostdin",
+                "-protocol_whitelist",
+                "pipe",
+                "-i",
+                "pipe:0",
+                "-map",
+                "0:a:0",
+                "-vn",
+                "-t",
+                "121",
+                "-ac",
+                "1",
+                "-ar",
+                "8000",
+                "-f",
+                "s16le",
+                "pipe:1",
+            ],
+            **options,
+        )
+        duration = len(decoded.stdout) / 16000
+        if decoded.returncode or not 0 < duration <= 120:
+            raise ValueError()
+        return mime, duration
+    except (ValueError, KeyError, subprocess.TimeoutExpired):
+        raise DomainError(
+            415,
+            "FILE_TYPE_UNSUPPORTED",
+            "语音须为完整可解码的 WAV/WebM/OGG/MP3/M4A，且不超过120秒。",
+        ) from None
 
 
 def validate_document(content: bytes):

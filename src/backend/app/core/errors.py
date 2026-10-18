@@ -10,11 +10,20 @@ class DomainError(Exception):
 
 
 def error_response(request: Request, status: int, code: str, message: str, details=None):
+    modern = getattr(request.app.state, "contract_version", "0.4") == "0.4"
+    if modern and isinstance(details, list):
+        details = {"field_errors": {x["field"]: [x["message"]] for x in details}}
     return JSONResponse(
         status_code=status,
         content={
-            "error": {"code": code, "message": message, "details": details or []},
-            "requestId": getattr(request.state, "request_id", "unknown"),
+            "error": {
+                "code": code,
+                "message": message,
+                "details": details or ({} if modern else []),
+            },
+            ("request_id" if modern else "requestId"): getattr(
+                request.state, "request_id", "unknown"
+            ),
         },
     )
 
@@ -48,7 +57,12 @@ def install_handlers(app):
 
 
 def result(request: Request, data):
-    return {"data": data, "requestId": request.state.request_id}
+    key = (
+        "request_id"
+        if getattr(request.app.state, "contract_version", "0.4") == "0.4"
+        else "requestId"
+    )
+    return {"data": data, key: request.state.request_id}
 
 
 def missing():
