@@ -33,3 +33,29 @@ pnpm run dev
 - [生成的完整后端 OpenAPI](docs/contracts/backend-openapi.json)
 
 真实 PostgreSQL、并发事务、当前 v0.4 前端访问层及浏览器登录权限已联调；测试使用合成资料。注册申请、审批、画像和推荐工作流已有页面。未预装真实招生数据；模型、向量检索、学校认证审核、长期记忆和案例共享等 M2–M4 功能未完成，不能用演示模式的效果作为真实后端能力。
+
+## Docker 一键部署
+
+如果需要一次启动前端、FastAPI、PostgreSQL 和后台 Worker，可在仓库根目录执行：
+
+```sh
+python deploy/manage.py up
+```
+
+脚本会首次生成 `deploy/.env` 中的本地密钥，构建镜像，等待 PostgreSQL 健康检查并执行 Alembic 迁移。默认访问地址为 http://localhost:8080；本地配置使用 HTTP 和非 Secure Cookie，适合开发验证。创建首个管理员：
+
+```sh
+docker compose --env-file deploy/.env -f deploy/compose.prod.yaml exec api \
+  python -m app.cli create-admin --nickname 管理员 --email you@example.com
+```
+
+常用运维命令：
+
+```sh
+python deploy/manage.py status
+python deploy/manage.py logs
+python deploy/manage.py backup
+python deploy/manage.py down
+```
+
+生产部署必须使用 HTTPS 反向代理，并在 `deploy/.env` 中设置 `APP_ENV=production`、`COOKIE_SECURE=true` 和准确的 HTTPS `ALLOWED_ORIGINS`。不要提交 `deploy/.env`、数据库数据、上传文件或 `backups/`。完整的部署、备份和恢复说明见 [`deploy/README.md`](deploy/README.md)。
