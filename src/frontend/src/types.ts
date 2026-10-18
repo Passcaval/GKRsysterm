@@ -1,4 +1,4 @@
-export type Tier = "reach" | "match" | "safe";
+export type Tier = "reach" | "match" | "safe" | "unknown";
 export type Signal = "strong" | "medium" | "weak" | "disputed";
 export interface User {
   id: string;
@@ -47,11 +47,11 @@ export interface School {
   history: { year: number; rank: number; score: number }[];
 }
 export interface Trust {
-  identity: number;
-  specificity: number;
-  corroboration: number;
-  freshness: number;
-  anomaly: number;
+  identity: number | null;
+  specificity: number | null;
+  corroboration: number | null;
+  freshness: number | null;
+  anomaly: number | null;
   supporting: number;
   opposing: number;
   explanation: string[];
@@ -79,7 +79,7 @@ export interface Recommendation {
   schoolId: string;
   major: string;
   tier: Tier;
-  matchScore: number;
+  matchScore: number | null;
   reasons: string[];
   warnings: string[];
   sourceIds: string[];

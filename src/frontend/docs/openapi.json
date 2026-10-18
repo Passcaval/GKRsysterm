@@ -3,7 +3,7 @@
   "info": {
     "title": "夜航 Night Voyage · 前后端对接契约",
     "version": "0.1.0",
-    "description": "基于技术方案的新增接口设计提案，非既有后端接口。与src/api.ts同步；中文说明见docs/API.md。"
+    "description": "现有前端17项兼容接口，与src/api.ts同步。M0–M1真实后端扩展与限制见共享docs/contracts/BACKEND.md，完整路由见backend-openapi.json。"
   },
   "servers": [
     {
@@ -3211,27 +3211,42 @@
         "additionalProperties": false,
         "properties": {
           "identity": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 100
           },
           "specificity": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 100
           },
           "corroboration": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 100
           },
           "freshness": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 100
           },
           "anomaly": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 100,
             "description": "越高表示异常安全度越高，非异常概率"
@@ -3373,14 +3388,18 @@
             "enum": [
               "reach",
               "match",
-              "safe"
+              "safe",
+              "unknown"
             ]
           },
           "matchScore": {
-            "type": "integer",
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 100,
-            "description": "偏好匹配度，不得当作录取概率"
+            "description": "偏好匹配度，不得当作录取概率；缺少偏好时为 null"
           },
           "reasons": {
             "type": "array",

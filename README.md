@@ -22,4 +22,13 @@ pnpm run dev
 - [开发者日志](docs/开发日志.md)：逐次提交的改动、作者、验证和合并记录。
 - [提交与协作约定](CONTRIBUTING.md)：每次提交同步追加日志，保留其他开发者的历史。
 
-当前提交包含前端和模拟数据，真实后端与数据联调尚未完成；最终接口需与系统技术方案和后端实现协商确认。
+## 后端：M0–M1
+
+真实后端位于 [`src/backend`](src/backend)，使用 FastAPI、SQLAlchemy、Alembic 和 PostgreSQL 17。提供注册审批、统一登录、画像版本、官方资料导入、规则推荐与反馈；现有前端17项操作通过兼容接口对接。
+
+没有本机 PostgreSQL 可使用随项目提供的 Docker Compose，数据库仅绑定 `127.0.0.1:55432`，与其他容器分开保存。按[后端启动与测试说明](src/backend/README.md)初始化数据库和管理员，并分别启动 API、Worker；前端设置 `VITE_API_MODE=http` 后启动。默认前端仍是演示模式。
+
+- [后端实际接口、数据字典和前端差异](docs/contracts/BACKEND.md)
+- [生成的完整后端 OpenAPI](docs/contracts/backend-openapi.json)
+
+真实 PostgreSQL、并发事务和前端访问层联调已验证；测试使用合成资料。未预装真实招生数据，模型、向量检索及 M2–M4 不在本阶段范围；注册审批等新增业务目前提供 API，完整前端页面仍待补齐。

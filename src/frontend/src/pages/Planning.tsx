@@ -12,7 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useApp } from "../store";
-import { api } from "../api";
+import { api, isMock } from "../api";
 import { classify, moveEntry, tierLabel, tierSymbol } from "../domain";
 import {
   PageTitle,
@@ -95,28 +95,36 @@ function Routes() {
           onAction={() => navigate("/profile")}
         />
       ) : recommendations.length === 0 && !busy ? (
-        <Empty text="当前条件下没有匹配院校，可以调整预算或选科档案。" />
+        <Empty text="当前没有可展示的候选，请核对数据覆盖范围、报考条件与官方资料。" />
       ) : null}
       {!error &&
-        (["reach", "match", "safe"] as Tier[]).map((t) => (
+        (
+          (isMock
+            ? ["reach", "match", "safe"]
+            : ["unknown", "reach", "match", "safe"]) as Tier[]
+        ).map((t) => (
           <section className={`route-lane ${t}`} key={t}>
             <div className="route-lane-title">
               <span>{tierSymbol[t]}</span>
               <div>
                 <h2>
                   {tierLabel[t]}
-                  {t === "reach"
-                    ? " · 向热爱靠近"
-                    : t === "match"
-                      ? " · 与期待相逢"
-                      : " · 给未来一份安心"}
+                  {t === "unknown"
+                    ? " · 补充依据后再判断"
+                    : t === "reach"
+                      ? " · 向热爱靠近"
+                      : t === "match"
+                        ? " · 与期待相逢"
+                        : " · 给未来一份安心"}
                 </h2>
                 <p>
-                  {t === "reach"
-                    ? "存在较大位次挑战，谨慎评估"
-                    : t === "match"
-                      ? "参考历史位次，继续核验当年计划"
-                      : "仍有政策与计划变化风险"}
+                  {t === "unknown"
+                    ? "条件或历史可比性尚待确认，不能视为已满足报考要求"
+                    : t === "reach"
+                      ? "存在较大位次挑战，谨慎评估"
+                      : t === "match"
+                        ? "参考历史位次，继续核验当年计划"
+                        : "仍有政策与计划变化风险"}
                 </p>
               </div>
               <span className="muted">
@@ -129,11 +137,14 @@ function Routes() {
                 .map((r) => {
                   const s = data.schools.find((s) => s.id === r.schoolId);
                   return s ? (
-                    <div className="recommendation" key={s.id}>
+                    <div className="recommendation" key={s.id + ":" + r.major}>
                       <SchoolCard school={s} compact tier={r.tier} />
                       <div className="recommendation-reasons">
                         <span className="source-tag inference">
-                          偏好匹配度 {r.matchScore}/100 · 非录取概率
+                          {r.matchScore === null
+                            ? "偏好匹配度待补充"
+                            : `偏好匹配度 ${r.matchScore}/100`}{" "}
+                          · 非录取概率
                         </span>
                         <p>{r.reasons.join("；")}</p>
                         {r.postIds.length > 0 && (
@@ -472,7 +483,11 @@ function Workbench() {
                     {s?.name || "已失效院校"}{" "}
                     {s && (
                       <TierBadge
-                        tier={classify(data.profile?.rank || 23500, s.rank)}
+                        tier={
+                          isMock
+                            ? classify(data.profile?.rank || 23500, s.rank)
+                            : "unknown"
+                        }
                       />
                     )}
                   </h3>
@@ -596,10 +611,19 @@ function Workbench() {
             </div>
           )}
           <div className="distribution">
-            {(["reach", "match", "safe"] as Tier[]).map((t) => {
+            {(
+              (isMock
+                ? ["reach", "match", "safe"]
+                : ["unknown", "reach", "match", "safe"]) as Tier[]
+            ).map((t) => {
               const count = data.plan.entries.filter((e) => {
                 const s = data.schools.find((s) => s.id === e.schoolId);
-                return s && classify(data.profile?.rank || 23500, s.rank) === t;
+                return (
+                  s &&
+                  (isMock
+                    ? classify(data.profile?.rank || 23500, s.rank)
+                    : "unknown") === t
+                );
               }).length;
               return (
                 <div key={t}>

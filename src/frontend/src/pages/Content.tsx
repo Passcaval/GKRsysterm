@@ -243,12 +243,12 @@ function TrustPanel({ post }: { post: Post }) {
           <div>
             <span>{name}</span>
             <b>
-              {values[i]}
-              <small>/100</small>
+              {values[i] === null ? "待评估" : values[i]}
+              {values[i] !== null && <small>/100</small>}
             </b>
           </div>
           <div className="meter">
-            <span style={{ width: values[i] + "%" }} />
+            <span style={{ width: (values[i] ?? 0) + "%" }} />
           </div>
           <p>{post.trust.explanation[i]}</p>
         </div>

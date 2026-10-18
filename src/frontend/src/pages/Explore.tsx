@@ -13,6 +13,7 @@ import {
   Navigation,
 } from "lucide-react";
 import { useApp } from "../store";
+import { isMock } from "../api";
 import { SectionTitle, SignalBadge, LinkButton } from "../components";
 import { classify, rankPosition, tierSymbol } from "../domain";
 import type { School } from "../types";
@@ -75,11 +76,11 @@ export function StarMap({
         });
     });
   }
-  const rank = data.profile?.rank || 23500;
+  const rank = data.profile?.rank ?? (isMock ? 23500 : 0);
   const docked = data.schools.find((s) => s.id === dockedSchoolId);
   const ranks = data.schools.map((s) => s.rank);
   const boatPosition = {
-    x: rankPosition(docked?.rank ?? rank, ranks),
+    x: docked || rank ? rankPosition(docked?.rank ?? rank, ranks) : 50,
     y: docked?.y ?? 82,
   };
   return (
@@ -103,7 +104,7 @@ export function StarMap({
         <span>
           {data.profile?.province || "未设省份"} ·{" "}
           {data.profile?.subjects.map((s) => s[0]).join("") || "选科待补充"} ·
-          示例分布
+          {isMock ? "示例分布" : "历史资料分布"}
         </span>
       </div>
       <div className="map-body">
@@ -137,18 +138,20 @@ export function StarMap({
               top: `${boatPosition.y}%`,
             }}
             onClick={() => navigate("/profile")}
-            aria-label={`你的船，${docked ? `停靠${docked.name}` : `省内位次${rank.toLocaleString()}`}；点击修改考生档案`}
+            aria-label={`你的船，${docked ? `停靠${docked.name}` : rank ? `省内位次${rank.toLocaleString()}` : "尚未填写位次"}；点击修改考生档案`}
           >
             <span className="boat-ripple" aria-hidden="true" />
             <img src={voyagerTop} alt="俯视下坐在船上、手持星图的航海者" />
             <span className="position-label">
               {docked ? "已停靠" : "你的位置"}{" "}
-              <b>{docked?.name ?? rank.toLocaleString()}</b>
+              <b>
+                {docked?.name ?? (rank ? rank.toLocaleString() : "待填写位次")}
+              </b>
             </span>
           </button>
           {schools.map((s) => (
             <button
-              className={`star-node ${classify(rank, s.rank)} ${selectedSchoolId === s.id ? "selected" : ""}`}
+              className={`star-node ${isMock ? classify(rank, s.rank) : "unknown"} ${selectedSchoolId === s.id ? "selected" : ""}`}
               data-school-id={s.id}
               style={{
                 left: `${rankPosition(
@@ -161,7 +164,7 @@ export function StarMap({
               onClick={() =>
                 onSelect ? onSelect(s) : navigate("/school/" + s.id)
               }
-              aria-label={`查看${s.name}，示例位次${s.rank}`}
+              aria-label={`查看${s.name}，${isMock ? "示例" : "历史"}位次${s.rank}`}
               aria-pressed={onSelect ? selectedSchoolId === s.id : undefined}
             >
               <span className="star-glow">
@@ -169,7 +172,7 @@ export function StarMap({
               </span>
               <span className="star-name">
                 <span className="map-tier" aria-hidden="true">
-                  {tierSymbol[classify(rank, s.rank)]}
+                  {tierSymbol[isMock ? classify(rank, s.rank) : "unknown"]}
                 </span>{" "}
                 {s.name}
                 <small>
@@ -180,14 +183,26 @@ export function StarMap({
           ))}
         </div>
         <div className="map-axis">
-          ← 相对稳妥 <span>示例历史录取位次</span> 更有挑战 →
+          {isMock ? (
+            <>
+              ← 相对稳妥 <span>示例历史录取位次</span> 更有挑战 →
+            </>
+          ) : (
+            <span>历史位次参考，须核对专业与统计口径</span>
+          )}
         </div>
       </div>
       <div className="map-bottom">
         <div className="legend">
-          <span className="safe">■ 保底探索</span>
-          <span className="match">● 稳妥选择</span>
-          <span className="reach">▲ 勇敢一试</span>
+          {isMock ? (
+            <>
+              <span className="safe">■ 保底探索</span>
+              <span className="match">● 稳妥选择</span>
+              <span className="reach">▲ 勇敢一试</span>
+            </>
+          ) : (
+            <span>◇ 条件与历史可比性待核对</span>
+          )}
         </div>
         {!small && (
           <div className="zoom">

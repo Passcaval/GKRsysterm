@@ -1,10 +1,12 @@
 import type { Profile, School, Tier, PlanEntry } from "./types.ts";
 export const tierLabel: Record<Tier, string> = {
+  unknown: "待核对",
   reach: "冲",
   match: "稳",
   safe: "保",
 };
 export const tierSymbol: Record<Tier, string> = {
+  unknown: "◇",
   reach: "▲",
   match: "●",
   safe: "■",

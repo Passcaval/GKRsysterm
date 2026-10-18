@@ -9,7 +9,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useApp } from "./store";
-import { api } from "./api";
+import { api, isMock } from "./api";
 import { classify, tierLabel, tierSymbol } from "./domain";
 import type { School, Signal, Tier } from "./types";
 export const signalLabels: Record<Signal, string> = {
@@ -169,7 +169,8 @@ export function SchoolCard({
   const favorite = data.favorites.includes(school.id);
   const inPlan = data.plan.entries.some((e) => e.schoolId === school.id);
   const tier =
-    providedTier || classify(data.profile?.rank || 23500, school.rank);
+    providedTier ||
+    (isMock ? classify(data.profile?.rank || 23500, school.rank) : "unknown");
   async function add() {
     if (saving) return;
     setSaving(true);

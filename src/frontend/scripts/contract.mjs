@@ -72,15 +72,30 @@ const schemas = {
     history: arr(obj({ year: int(), rank: int(), score: int() })),
   }),
   Trust: obj({
-    identity: int({ minimum: 0, maximum: 100 }),
-    specificity: int({ minimum: 0, maximum: 100 }),
-    corroboration: int({ minimum: 0, maximum: 100 }),
-    freshness: int({ minimum: 0, maximum: 100 }),
-    anomaly: int({
-      minimum: 0,
-      maximum: 100,
-      description: "越高表示异常安全度越高，非异常概率",
-    }),
+    identity: {
+      ...int({ minimum: 0, maximum: 100 }),
+      type: ["integer", "null"],
+    },
+    specificity: {
+      ...int({ minimum: 0, maximum: 100 }),
+      type: ["integer", "null"],
+    },
+    corroboration: {
+      ...int({ minimum: 0, maximum: 100 }),
+      type: ["integer", "null"],
+    },
+    freshness: {
+      ...int({ minimum: 0, maximum: 100 }),
+      type: ["integer", "null"],
+    },
+    anomaly: {
+      ...int({
+        minimum: 0,
+        maximum: 100,
+        description: "越高表示异常安全度越高，非异常概率",
+      }),
+      type: ["integer", "null"],
+    },
     supporting: int({ minimum: 0 }),
     opposing: int({ minimum: 0 }),
     explanation: { ...arr(str()), minItems: 5, maxItems: 5 },
@@ -107,12 +122,15 @@ const schemas = {
   Recommendation: obj({
     schoolId: str(),
     major: str(),
-    tier: en(["reach", "match", "safe"]),
-    matchScore: int({
-      minimum: 0,
-      maximum: 100,
-      description: "偏好匹配度，不得当作录取概率",
-    }),
+    tier: en(["reach", "match", "safe", "unknown"]),
+    matchScore: {
+      ...int({
+        minimum: 0,
+        maximum: 100,
+        description: "偏好匹配度，不得当作录取概率；缺少偏好时为 null",
+      }),
+      type: ["integer", "null"],
+    },
     reasons: arr(str()),
     warnings: arr(str()),
     sourceIds: arr(str()),
@@ -458,7 +476,7 @@ const contract = {
     title: "夜航 Night Voyage · 前后端对接契约",
     version: "0.1.0",
     description:
-      "基于技术方案的新增接口设计提案，非既有后端接口。与src/api.ts同步；中文说明见docs/API.md。",
+      "现有前端17项兼容接口，与src/api.ts同步。M0–M1真实后端扩展与限制见共享docs/contracts/BACKEND.md，完整路由见backend-openapi.json。",
   },
   servers: [
     { url: "http://127.0.0.1:8000/api/v1", description: "FastAPI本地联调" },
