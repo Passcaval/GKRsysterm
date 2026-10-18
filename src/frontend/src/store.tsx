@@ -4,10 +4,12 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react";
 import type { Bootstrap } from "./types";
 import { api } from "./api";
+import { onSessionReset, sessionEpoch, errorText } from "./transport";
 interface State {
   data: Bootstrap;
   refresh: () => Promise<void>;
@@ -25,14 +27,48 @@ export function Provider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Bootstrap | null>(null);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  const generation = useRef(0);
   const refresh = useCallback(async () => {
+    const current = ++generation.current,
+      epoch = sessionEpoch();
     setError("");
     try {
-      setData(await api.bootstrap());
+      const value = await api.bootstrap();
+      if (current === generation.current && epoch === sessionEpoch())
+        setData(value);
     } catch (e) {
-      setError((e as Error).message);
+      if (current === generation.current) setError(errorText(e));
     }
   }, []);
+  useEffect(
+    () =>
+      onSessionReset(() => {
+        generation.current++;
+        setData((d) =>
+          d
+            ? {
+                ...d,
+                user: null,
+                profile: null,
+                favorites: [],
+                verifications: [],
+                sources: [],
+                posts: d.posts
+                  .filter((p) => p.status === "published" && !p.isMine)
+                  .map((p) => ({ ...p, isMine: false })),
+                plan: {
+                  id: "anonymous",
+                  name: "我的志愿草案",
+                  version: 0,
+                  entries: [],
+                },
+              }
+            : d,
+        );
+        location.hash = "/login";
+      }),
+    [],
+  );
   useEffect(() => {
     void refresh();
   }, [refresh]);
@@ -69,7 +105,13 @@ export function Provider({ children }: { children: ReactNode }) {
         },
       }}
     >
-      {children}
+      {error && (
+        <div className="session-error" role="alert">
+          <span>{error}</span>
+          <button onClick={() => void refresh()}>重试加载</button>
+        </div>
+      )}
+      <div key={data.user?.id || "anonymous"}>{children}</div>
       {toast && (
         <div className="toast" role="status">
           {toast}

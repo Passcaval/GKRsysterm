@@ -1,3 +1,11 @@
+import {
+  Me,
+  Registration,
+  ApplicationStatus,
+  RegistrationAdmin,
+} from "./Identity";
+import History from "./History";
+import VerificationAdmin from "./VerificationAdmin";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -17,8 +25,9 @@ import {
 } from "lucide-react";
 import { useApp } from "../store";
 import { api, isMock } from "../api";
-import { canReview } from "../auth";
 import { sampleProfile } from "../data";
+import { errorText } from "../transport";
+import { hasPermission } from "../types";
 import { validateProfile } from "../domain";
 import {
   PageTitle,
@@ -29,16 +38,31 @@ import {
   SignalBadge,
   Evidence,
 } from "../components";
-import type { Profile, Post } from "../types";
+import type { Profile, Post, User } from "../types";
 function ProfilePage() {
   const { data, update, notify, navigate } = useApp();
   const [value, setValue] = useState<Profile>(
-    data.profile || { ...sampleProfile, score: 0, rank: 0, consent: false },
+    data.profile || {
+      province: "",
+      year: 2026,
+      score: null,
+      rank: null,
+      subjects: [],
+      cities: [],
+      interests: [],
+      budget: null,
+      acceptAdjustment: false,
+      consent: false,
+      version: 0,
+    },
   );
   const [mode, setMode] = useState("steps");
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [natural, setNatural] = useState(""),
+    [proposal, setProposal] = useState<Partial<Profile> | null>(null),
+    [versions, setVersions] = useState<Profile[]>([]);
   function patch<K extends keyof Profile>(key: K, v: Profile[K]) {
     setValue((p) => ({ ...p, [key]: v }));
   }
@@ -47,10 +71,10 @@ function ProfilePage() {
       <label>
         生源省份
         <select
-          required
           value={value.province}
           onChange={(e) => patch("province", e.target.value)}
         >
+          <option value="">暂未填写</option>
           {[
             "浙江",
             "江苏",
@@ -102,28 +126,48 @@ function ProfilePage() {
       <label>
         高考分数
         <input
-          required
           type="number"
           min="0"
           max="900"
-          value={value.score}
-          onChange={(e) => patch("score", Number(e.target.value))}
+          value={value.score ?? ""}
+          onChange={(e) =>
+            patch(
+              "score",
+              e.target.value === "" ? null : Number(e.target.value),
+            )
+          }
         />
       </label>
       <label>
         省内位次
         <input
-          required
           type="number"
           min="1"
           max="5000000"
-          value={value.rank}
-          onChange={(e) => patch("rank", Number(e.target.value))}
+          value={value.rank ?? ""}
+          onChange={(e) =>
+            patch("rank", e.target.value === "" ? null : Number(e.target.value))
+          }
         />
       </label>
       <p className="form-hint">
-        请按成绩单填写省内位次。当前仅提供三门选考科目模式，其他考试模式暂不支持推荐。
+        分数和位次可以暂不填写。校园生活查询不需要成绩，风险分析会单独补问位次及口径。
       </p>
+      <label>
+        位次口径
+        <input
+          value={value.rankCohort || ""}
+          onChange={(e) => patch("rankCohort", e.target.value || null)}
+          placeholder="如：浙江普通类全省位次"
+        />
+      </label>
+      <label>
+        招生类别
+        <input
+          value={value.examCategory || "普通类"}
+          onChange={(e) => patch("examCategory", e.target.value)}
+        />
+      </label>
     </div>,
     <div key="subjects">
       <h3>你的三门选考科目</h3>
@@ -184,12 +228,16 @@ function ProfilePage() {
       <label>
         每年学费预算 / 元
         <input
-          required
           type="number"
           min="0"
           max="500000"
-          value={value.budget}
-          onChange={(e) => patch("budget", Number(e.target.value))}
+          value={value.budget ?? ""}
+          onChange={(e) =>
+            patch(
+              "budget",
+              e.target.value === "" ? null : Number(e.target.value),
+            )
+          }
         />
       </label>
       <label className="switch-label">
@@ -199,6 +247,40 @@ function ProfilePage() {
           onChange={(e) => patch("acceptAdjustment", e.target.checked)}
         />
         可以接受专业调剂
+      </label>
+      <label>
+        预算范围
+        <select
+          value={value.budgetScope || "tuition"}
+          onChange={(e) =>
+            patch("budgetScope", e.target.value as "tuition" | "total")
+          }
+        >
+          <option value="tuition">CNY / 每年学费</option>
+          <option value="total">CNY / 每年总支出</option>
+        </select>
+      </label>
+      <label>
+        地域偏好约束
+        <select
+          value={
+            value.preferences?.find((p) => p.field === "preferred_regions")
+              ?.strength || "soft"
+          }
+          onChange={(e) =>
+            patch("preferences", [
+              {
+                field: "preferred_regions",
+                value: value.cities.join("、"),
+                strength: e.target.value as "hard" | "soft",
+                priority: 1,
+              },
+            ])
+          }
+        >
+          <option value="soft">尽量满足</option>
+          <option value="hard">必须满足</option>
+        </select>
       </label>
     </div>,
   ];
@@ -220,7 +302,7 @@ function ProfilePage() {
       notify("你的坐标已更新，新的航线正在等待");
       navigate("/routes");
     } catch (e) {
-      setErrors([(e as Error).message]);
+      setErrors([errorText(e)]);
     } finally {
       setBusy(false);
     }
@@ -232,6 +314,89 @@ function ProfilePage() {
         title="先找到你的坐标"
         description="只收集推荐需要的信息，不需要姓名、身份证号或精确住址。你可以随时清除档案。"
       />
+      <section className="panel profile-proposal">
+        <h2>先提取，再由你确认</h2>
+        <label>
+          自然语言描述
+          <textarea
+            value={natural}
+            onChange={(e) => setNatural(e.target.value)}
+            placeholder="如：我在浙江，628分，位次23500…"
+          />
+        </label>
+        <button
+          type="button"
+          className="button"
+          disabled={!natural.trim() || busy}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              const result = await api.parseProfile(natural);
+              setProposal(result.proposedChanges);
+            } catch (e) {
+              setErrors([errorText(e)]);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          提取修改建议
+        </button>
+        {proposal && (
+          <div>
+            <pre>{JSON.stringify(proposal, null, 2)}</pre>
+            <button
+              className="button"
+              onClick={() => {
+                setValue((p) => ({
+                  ...p,
+                  ...Object.fromEntries(
+                    Object.entries(proposal).filter(([, v]) => v !== undefined),
+                  ),
+                }));
+                setProposal(null);
+              }}
+            >
+              确认填入表单（尚未保存）
+            </button>
+          </div>
+        )}
+        <p className="muted">
+          当前画像版本 {value.version || 0} ·{" "}
+          {value.profileVersionId || "新画像"}
+        </p>
+        <button
+          className="text-button"
+          onClick={async () => {
+            try {
+              setVersions(await api.profileVersions());
+            } catch (e) {
+              setErrors([errorText(e)]);
+            }
+          }}
+        >
+          查看历史／并发更新版本
+        </button>
+        {versions.length > 0 && (
+          <div>
+            {versions.map((p) => (
+              <p key={p.profileVersionId}>
+                v{p.version} · {p.profileVersionId} ·{" "}
+                {p.province || "省份待补充"} · 位次 {p.rank ?? "未填写"}
+              </p>
+            ))}
+            <button
+              className="button"
+              onClick={() => {
+                setValue(versions[versions.length - 1]);
+                setErrors([]);
+              }}
+            >
+              载入最新版本并替换当前表单
+            </button>
+          </div>
+        )}
+      </section>
       <div className="profile-layout">
         <section className="panel">
           <div className="section-title">
@@ -350,160 +515,6 @@ function ProfilePage() {
     </>
   );
 }
-function Me() {
-  const { data, update, notify, navigate, refresh } = useApp();
-  const [clear, setClear] = useState(false);
-  const [busy, setBusy] = useState(false);
-  return (
-    <>
-      <PageTitle
-        eyebrow="YOUR PERSONAL LOGBOOK"
-        title={data.user ? `${data.user.name}，航行继续。` : "欢迎来到夜航"}
-        description="收藏心动的院校，留下探索的轨迹，也随时掌握你的个人数据。"
-      />
-      <div className="account-grid">
-        <section className="panel">
-          <UserRound size={28} />
-          <h2>{data.user ? "我的账号" : "登录以保存你的探索"}</h2>
-          <p className="muted">
-            {data.user
-              ? `当前角色：${{ student: "考生", contributor: "认证贡献者", reviewer: "内容审核员", admin: "管理员" }[data.user.role]}`
-              : "登录后保存你的档案、收藏和志愿草案。"}
-          </p>
-          <button className="button" onClick={() => navigate("/login")}>
-            {data.user ? "切换账号" : "登录账号"}
-          </button>
-          {data.user && (
-            <button
-              className="text-button"
-              onClick={async () => {
-                try {
-                  await api.logout();
-                  update({
-                    user: null,
-                    profile: null,
-                    favorites: [],
-                    verifications: [],
-                    posts: data.posts.filter(
-                      (p) => p.status === "published" && !p.isMine,
-                    ),
-                    plan: {
-                      id: "",
-                      name: "我的志愿草案",
-                      version: 1,
-                      entries: [],
-                    },
-                  });
-                  localStorage.removeItem("nv-compare");
-                  sessionStorage.removeItem("nv-question");
-                  notify("已退出账号");
-                  navigate("/login");
-                } catch (e) {
-                  notify((e as Error).message);
-                }
-              }}
-            >
-              <LogOut size={14} />
-              退出登录
-            </button>
-          )}
-        </section>
-        <section className="panel">
-          <FileCheck2 size={28} />
-          <h2>我的考生档案</h2>
-          <p className="muted">
-            {data.profile
-              ? `${data.profile.province} · ${data.profile.year} · ${data.profile.score} 分 · 位次 ${data.profile.rank.toLocaleString()}`
-              : "还没有建立档案"}
-          </p>
-          <button className="button" onClick={() => navigate("/profile")}>
-            完善我的档案
-            <ArrowRight size={14} />
-          </button>
-        </section>
-        <section className="panel">
-          <ShieldCheck size={28} />
-          <h2>你的数据，你来决定</h2>
-          <p className="muted">
-            清除档案、收藏、志愿草案和认证申请记录。
-            {isMock
-              ? "演示记录仅存储于此浏览器。"
-              : "个人数据将按隐私政策清除。"}
-          </p>
-          <button className="text-button danger" onClick={() => setClear(true)}>
-            <Trash2 size={14} />
-            清除我的个人数据
-          </button>
-        </section>
-      </div>
-      <SectionTitle title="收藏的心动院校">
-        <span className="muted">{data.favorites.length} 所</span>
-      </SectionTitle>
-      <div className="school-grid">
-        {data.schools
-          .filter((s) => data.favorites.includes(s.id))
-          .map((s) => (
-            <SchoolCard school={s} key={s.id} />
-          ))}
-      </div>
-      {!data.favorites.length && (
-        <Empty
-          text="遇见喜欢的学校，点亮心形就能收藏。"
-          action="去探索"
-          onAction={() => navigate("/explore")}
-        />
-      )}
-      <SectionTitle title="我的投稿" />
-      {data.posts
-        .filter((p) => p.isMine)
-        .map((p) => (
-          <div className="panel my-post" key={p.id}>
-            <button
-              className="text-button"
-              onClick={() => navigate("/post/" + p.id)}
-            >
-              {p.title}
-            </button>
-            <span className="source-tag">
-              {
-                {
-                  pending: "等待审核",
-                  published: "已发布",
-                  rejected: "未通过",
-                }[p.status]
-              }
-            </span>
-          </div>
-        ))}
-      {clear && (
-        <Modal title="清除个人数据" onClose={() => setClear(false)}>
-          <p>这将清除考生档案、收藏和志愿草案等个人记录，清除后无法恢复。</p>
-          <button
-            className="button danger"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await api.deleteProfile();
-                localStorage.removeItem("nv-compare");
-                sessionStorage.removeItem("nv-question");
-                await refresh();
-                setClear(false);
-                notify("个人记录已清除");
-              } catch (e) {
-                notify((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            确认清除
-          </button>
-        </Modal>
-      )}
-    </>
-  );
-}
 function Lighthouse() {
   const { data, notify, refresh } = useApp();
   const [tab, setTab] = useState("write");
@@ -521,6 +532,23 @@ function Lighthouse() {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const submissionKey = useRef(crypto.randomUUID());
+  const [campusId, setCampusId] = useState(""),
+    [majorId, setMajorId] = useState(""),
+    [experiencedAt, setExperiencedAt] = useState(""),
+    [visibility, setVisibility] = useState<"public" | "private">("public");
+  useEffect(() => {
+    submissionKey.current = crypto.randomUUID();
+  }, [
+    schoolId,
+    topic,
+    title,
+    body,
+    campusId,
+    majorId,
+    experiencedAt,
+    visibility,
+  ]);
   return (
     <>
       <PageTitle
@@ -554,7 +582,20 @@ function Lighthouse() {
               setBusy(true);
               try {
                 if (tab === "write") {
-                  await api.submitPost({ schoolId, topic, title, body });
+                  await api.submitPost(
+                    {
+                      schoolId,
+                      topic,
+                      title,
+                      body,
+                      campusId: campusId || null,
+                      majorId: majorId || null,
+                      experiencedAt: experiencedAt || null,
+                      visibility,
+                      originality: "original",
+                    },
+                    submissionKey.current,
+                  );
                   setTitle("");
                   setBody("");
                   setConsent(false);
@@ -593,6 +634,42 @@ function Lighthouse() {
             </label>
             {tab === "write" ? (
               <>
+                <div className="form-grid">
+                  <label>
+                    校区ID（可暂缺）
+                    <input
+                      value={campusId}
+                      onChange={(e) => setCampusId(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    专业ID（可暂缺）
+                    <input
+                      value={majorId}
+                      onChange={(e) => setMajorId(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    亲历时间
+                    <input
+                      type="date"
+                      value={experiencedAt}
+                      onChange={(e) => setExperiencedAt(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    可见范围
+                    <select
+                      value={visibility}
+                      onChange={(e) =>
+                        setVisibility(e.target.value as "public" | "private")
+                      }
+                    >
+                      <option value="public">审核后公开</option>
+                      <option value="private">仅本人可见</option>
+                    </select>
+                  </label>
+                </div>
                 <label>
                   你想分享的主题
                   <select
@@ -753,11 +830,14 @@ function Admin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  async function load() {
+  const [cursor, setCursor] = useState<string | null>(null);
+  async function load(append = false) {
     setLoading(true);
     try {
-      const q = await api.moderation();
-      setQueue(q);
+      const page = await api.moderation(append ? cursor : null);
+      const q = page.items;
+      setCursor(page.nextCursor);
+      setQueue((rows) => (append ? [...rows, ...q] : q));
       setSelected((id) => (q.some((p) => p.id === id) ? id : q[0]?.id || ""));
       setError("");
     } catch (e) {
@@ -767,7 +847,7 @@ function Admin() {
     }
   }
   useEffect(() => {
-    if (canReview(data.user)) void load();
+    if (hasPermission(data.user, "content:review")) void load();
   }, [data.user?.role]);
   const p = queue.find((p) => p.id === selected);
   async function review(decision: "approve" | "reject") {
@@ -778,7 +858,7 @@ function Admin() {
     }
     setBusy(true);
     try {
-      await api.review(p.id, decision, reason);
+      await api.review(p.id, decision, reason, p.version || 1);
       setReason("");
       await refresh();
       await load();
@@ -789,7 +869,7 @@ function Admin() {
       setBusy(false);
     }
   }
-  if (!canReview(data.user))
+  if (!hasPermission(data.user, "content:review"))
     return (
       <>
         <PageTitle
@@ -798,9 +878,13 @@ function Admin() {
           description="此功能仅向内容审核员开放，用于核验来信与引用证据。"
         />
         <Empty
-          text={data.user ? "当前账号没有内容审核权限。" : "请先登录。"}
-          action={data.user ? "返回我的账号" : "前往登录"}
-          onAction={() => navigate(data.user ? "/me" : "/login")}
+          text={
+            isMock
+              ? "请在“我的”切换为内容审核员，体验审核流程。"
+              : "当前账号没有内容审核权限。"
+          }
+          action="前往我的账号"
+          onAction={() => navigate("/me")}
         />
       </>
     );
@@ -837,6 +921,11 @@ function Admin() {
             </button>
           ))}
           {!queue.length && <Empty text="待审队列已处理完成。" />}
+          {cursor && (
+            <button className="button" onClick={() => void load(true)}>
+              加载更多待审来信
+            </button>
+          )}
         </aside>
         {p ? (
           <>
@@ -893,7 +982,17 @@ function Admin() {
   );
 }
 export default function Account({ path }: { path: string }) {
-  return path === "/profile" ? (
+  return path === "/admin/verifications" ? (
+    <VerificationAdmin />
+  ) : path === "/history" ? (
+    <History />
+  ) : path === "/register" ? (
+    <Registration />
+  ) : path === "/application" ? (
+    <ApplicationStatus />
+  ) : path === "/admin/registrations" ? (
+    <RegistrationAdmin />
+  ) : path === "/profile" ? (
     <ProfilePage />
   ) : path === "/lighthouse" ? (
     <Lighthouse />
