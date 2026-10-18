@@ -112,7 +112,7 @@ export interface Recommendation {
   schoolId: string;
   major: string;
   tier: Tier;
-  matchScore: number;
+  matchScore: number | null;
   reasons: string[];
   warnings: string[];
   sourceIds: string[];
@@ -227,6 +227,7 @@ export interface RunQuestion {
   required: boolean;
 }
 export interface RecommendationItem {
+  majorId?: string;
   recommendationItemId: string;
   admissionUnitId: string;
   schoolId: string;

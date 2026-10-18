@@ -409,14 +409,18 @@ export function createWorkflowApi(ctx: Context) {
       const normalized = loginInput(identifier, password);
       identifier = normalized.identifier;
       loginType ??= normalized.login_type;
-      if (loginType === "email" && !validEmail(identifier))
+      if (isMock && loginType === "email" && !validEmail(identifier))
         throw new ApiError(
           422,
           "邮箱格式不正确，请重新输入。",
           undefined,
           "EMAIL_INVALID",
         );
-      if (loginType === "user_id" && !/^U[A-Za-z0-9-]+$/.test(identifier))
+      if (
+        isMock &&
+        loginType === "user_id" &&
+        !/^U[A-Za-z0-9-]+$/.test(identifier)
+      )
         throw new ApiError(
           422,
           "邮箱或用户ID格式不正确，请重新输入。",
@@ -524,7 +528,7 @@ export function createWorkflowApi(ctx: Context) {
           undefined,
           "VALIDATION_ERROR",
         );
-      const errors = validateRegistration(input);
+      const errors = isMock ? validateRegistration(input) : [];
       if (errors.length)
         throw new ApiError(
           422,

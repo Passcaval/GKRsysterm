@@ -62,6 +62,7 @@ function Item({
         major: item.major,
         adjustment: data.profile?.acceptAdjustment ?? false,
         admissionUnitId: item.admissionUnitId,
+        majorId: item.majorId ?? item.admissionUnitId,
         recommendationItemId: item.recommendationItemId,
         provinceCode: data.profile?.province,
         examYear: data.profile?.year,

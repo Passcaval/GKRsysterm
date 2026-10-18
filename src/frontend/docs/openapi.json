@@ -10790,7 +10790,11 @@
           },
           "status": {
             "type": "string",
-            "const": "pending"
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ]
           },
           "status_token": {
             "type": "string",
@@ -11026,6 +11030,9 @@
             ]
           },
           "major": {
+            "type": "string"
+          },
+          "major_id": {
             "type": "string"
           },
           "eligibility": {

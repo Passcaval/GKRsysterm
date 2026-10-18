@@ -1,0 +1,15 @@
+fastapi>=0.115,<1
+uvicorn>=0.34,<1
+sqlalchemy>=2.0,<2.1
+psycopg[binary]>=3.2,<4
+alembic>=1.15,<2
+pydantic-settings>=2.8,<3
+argon2-cffi>=23.1,<26
+regex>=2024.11
+python-multipart>=0.0.20
+pillow>=11,<13
+pypdf>=5,<7
+httpx>=0.28,<1
+pytest>=8,<10
+ruff>=0.11,<1
+jsonschema>=4.23,<5
