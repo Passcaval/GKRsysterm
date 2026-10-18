@@ -1,0 +1,641 @@
+/* A single campus becomes a quiet destination, with its own letters and context. */
+.campus-sky {
+  position: relative;
+  isolation: isolate;
+  min-height: 455px;
+  overflow: hidden;
+  border: 1px solid #d8c18c21;
+  border-radius: 12px;
+  background: #101b29;
+  margin-bottom: 38px;
+}
+.campus-night-art {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 78%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 66%;
+  z-index: -3;
+}
+.campus-sky:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(
+      90deg,
+      #111b2b 0%,
+      #111b2bf5 20%,
+      #111b2baa 43%,
+      #111b2b05 78%
+    ),
+    linear-gradient(0deg, #111b2b8c, transparent 35%);
+}
+.campus-sky-copy {
+  position: relative;
+  width: 60%;
+  padding: 25px 36px 40px;
+  z-index: 2;
+}
+.campus-sky-copy > .text-button:first-child {
+  font-size: 11px;
+  color: #a4adba;
+  margin-bottom: 36px;
+}
+.campus-sky-copy > .eyebrow {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #cbb78b;
+}
+.campus-coordinate {
+  font-size: 10px;
+  color: #b6bdc5;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 21px 0 15px;
+}
+.campus-coordinate > span:last-child {
+  margin-left: 6px;
+  color: #8b98a9;
+}
+.campus-sky h1 {
+  font-size: clamp(25px, 2.6vw, 39px);
+  line-height: 1.6;
+  font-weight: 400;
+  letter-spacing: 2px;
+  margin: 0;
+}
+.campus-sky h1 > span {
+  display: block;
+  font-size: 22px;
+  color: #dbc391;
+  letter-spacing: 8px;
+}
+.campus-sky-description {
+  color: #bbc0c6;
+  font-size: 12px;
+  line-height: 2.1;
+  margin: 18px 0;
+}
+.campus-sky-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  color: #aaa99e;
+}
+.campus-sky-meta > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.campus-profile-link {
+  margin-top: 22px;
+  font-size: 11px;
+}
+.campus-sky-caption {
+  position: absolute;
+  bottom: 20px;
+  right: 24px;
+  color: #c5b99c;
+  font-family: var(--serif);
+  font-size: 10px;
+  letter-spacing: 2px;
+}
+.sky-motion-toggle {
+  position: absolute;
+  right: 18px;
+  top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #c9c1aa;
+  font-size: 9px;
+  padding: 7px 10px;
+  background: #111b2b85;
+  border: 1px solid #d7c69625;
+  border-radius: 20px;
+  z-index: 3;
+}
+.meteor-field {
+  position: absolute;
+  inset: 0 0 27% 30%;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+}
+.meteor-field > span {
+  position: absolute;
+  width: 145px;
+  height: 1px;
+  background: linear-gradient(90deg, #fff9df, #e8cd8d99 16%, transparent);
+  border-radius: 50%;
+  opacity: 0;
+  transform-origin: left center;
+  animation: campus-meteor 9s linear infinite;
+}
+.meteor-field > span:before {
+  content: "";
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  left: 0;
+  top: -1px;
+  border-radius: 50%;
+  background: #fff7db;
+  box-shadow: 0 0 7px 2px #f7db9e99;
+}
+.meteor-field > span:nth-child(1) {
+  left: 47%;
+  top: 28%;
+  animation-delay: 1s;
+}
+.meteor-field > span:nth-child(2) {
+  left: 78%;
+  top: 12%;
+  animation-delay: 4.2s;
+  width: 115px;
+}
+.meteor-field > span:nth-child(3) {
+  left: 92%;
+  top: 39%;
+  animation-delay: 7s;
+  width: 100px;
+}
+@keyframes campus-meteor {
+  0% {
+    opacity: 0;
+    transform: translate(130px, -91px) rotate(-35deg);
+  }
+  2% {
+    opacity: 1;
+  }
+  12% {
+    opacity: 0;
+    transform: translate(-260px, 182px) rotate(-35deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-260px, 182px) rotate(-35deg);
+  }
+}
+.sky-paused .meteor-field > span {
+  animation-play-state: paused;
+}
+.campus-board-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 285px;
+  gap: 28px;
+  align-items: start;
+}
+.campus-letters {
+  min-width: 0;
+}
+.campus-board-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+.campus-board-heading h2 {
+  font-size: 23px;
+  font-weight: 400;
+  margin: 8px 0;
+}
+.campus-board-heading .muted {
+  font-size: 10px;
+}
+.campus-board .echo-toolbar {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.campus-board .chips {
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.campus-board .chips button {
+  font-size: 11px;
+  padding: 8px 11px;
+}
+.campus-board .toolbar {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.campus-board .toolbar .wide-input {
+  min-width: 0;
+  flex: 1 1 240px;
+}
+.campus-board .toolbar .muted {
+  font-size: 10px;
+}
+.campus-board .echo-wall {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.campus-board .echo-wall .letter {
+  min-height: 300px;
+}
+.campus-board .letter-author {
+  line-height: 1.9;
+}
+.campus-board .letter-author small {
+  display: block;
+}
+.campus-information {
+  display: grid;
+  gap: 17px;
+}
+.campus-info-card {
+  padding: 23px;
+}
+.campus-info-card > .eyebrow {
+  font-size: 8px;
+  display: block;
+  margin-bottom: 22px;
+}
+.campus-info-card > .school-seal {
+  margin-bottom: 12px;
+}
+.campus-info-card h2 {
+  font-size: 18px;
+  margin: 5px 0 14px;
+  font-weight: 400;
+}
+.campus-info-card > .muted {
+  font-size: 11px;
+  line-height: 1.9;
+}
+.campus-info-card dl {
+  font-size: 11px;
+  margin: 20px 0;
+}
+.campus-info-card dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #d1c09b12;
+}
+.campus-info-card dt {
+  color: #8d99a9;
+}
+.campus-info-card dd {
+  margin: 0;
+  text-align: right;
+}
+.campus-info-card h3 {
+  font-size: 12px;
+  font-weight: 400;
+  color: #beb9a8;
+}
+.campus-major-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 13px 0 22px;
+}
+.campus-major-chips > span {
+  font-size: 10px;
+  background: #c9b7850b;
+  border: 1px solid #c9b78524;
+  border-radius: 4px;
+  padding: 5px 8px;
+  color: #afbac4;
+}
+.campus-info-card .button,
+.campus-invitation .button {
+  width: 100%;
+  font-size: 11px;
+  justify-content: center;
+}
+.campus-invitation {
+  padding: 23px;
+  background: linear-gradient(135deg, #bba67512, #152132);
+}
+.campus-invitation .eyebrow {
+  font-size: 8px;
+}
+.campus-invitation h3 {
+  font-size: 17px;
+  font-weight: 400;
+  margin-top: 17px;
+}
+.campus-invitation p {
+  font-size: 11px;
+  line-height: 1.9;
+  color: #aab4c2;
+  margin: 13px 0 22px;
+}
+.atlas-echo-entry {
+  padding: 0 23px 22px;
+}
+.atlas-echo-entry p {
+  font-size: 10px;
+  margin: 0 0 12px;
+  color: #a7b1bf;
+}
+.atlas-echo-entry .button {
+  width: 100%;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.star-node.selected .star-glow:before {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.15);
+}
+.star-node.selected .star-name {
+  color: #f1d8a4;
+}
+.star-node.selected .star-glow > span {
+  box-shadow: 0 0 9px 3px #e5c27d99;
+}
+.fullscreen .star-node {
+  width: 53px;
+  height: 53px;
+  gap: 0;
+  justify-content: center;
+}
+.fullscreen .star-node .star-glow {
+  flex-shrink: 0;
+}
+.fullscreen .star-name {
+  position: absolute;
+  left: 43px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0;
+}
+.vessel-departed {
+  visibility: hidden;
+}
+.sailing-route {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.sailing-route polyline {
+  stroke: #dec48b55;
+  stroke-width: 1;
+  stroke-dasharray: 3 7;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.sailing-position {
+  position: absolute;
+  width: 126px;
+  height: 126px;
+  transform: translate(-50%, -50%);
+  z-index: 9;
+  pointer-events: none;
+}
+.rowing-video,
+.rowing-sprite {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.rowing-video {
+  mask-image: radial-gradient(ellipse at center, #000 36%, transparent 72%);
+}
+.rowing-sprite {
+  background-size: 400% 200%;
+  background-repeat: no-repeat;
+  animation: rowing-stroke 1.6s steps(1, end) infinite;
+}
+@keyframes rowing-stroke {
+  0%,
+  100% {
+    background-position: 0 0;
+  }
+  12.5% {
+    background-position: 33.333% 0;
+  }
+  25% {
+    background-position: 66.666% 0;
+  }
+  37.5% {
+    background-position: 100% 0;
+  }
+  50% {
+    background-position: 0 100%;
+  }
+  62.5% {
+    background-position: 33.333% 100%;
+  }
+  75% {
+    background-position: 66.666% 100%;
+  }
+  87.5% {
+    background-position: 100% 100%;
+  }
+}
+.rowing-wake {
+  position: absolute;
+  width: 38px;
+  height: 100px;
+  left: 44px;
+  top: 55%;
+  border: 1px solid #d9c18b22;
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 50%;
+  box-shadow: 0 10px 20px #dfc28b13;
+  animation: wake-drift 1.5s ease-out infinite;
+}
+@keyframes wake-drift {
+  from {
+    opacity: 0.8;
+    transform: scale(0.7) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.4) translateY(22px);
+  }
+}
+.sailing-status {
+  position: absolute;
+  z-index: 12;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background: #172434f5;
+  border: 1px solid #dfc28b40;
+  border-radius: 9px;
+  padding: 16px 20px;
+  box-shadow: 0 10px 40px #0004;
+  color: #e2cd9e;
+  max-width: calc(100% - 32px);
+}
+.sailing-status strong {
+  font-size: 12px;
+  font-weight: 400;
+  display: block;
+  white-space: nowrap;
+}
+.sailing-status small {
+  font-size: 9px;
+  color: #92a0b0;
+  display: block;
+  margin-top: 6px;
+}
+.sailing-status .text-button {
+  margin-left: 15px;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.atlas-page:has(.sailing-status) .navigator-launch {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .campus-board-layout {
+    grid-template-columns: minmax(0, 1fr) 255px;
+    gap: 20px;
+  }
+  .campus-board .echo-wall {
+    grid-template-columns: 1fr;
+  }
+  .campus-sky-copy {
+    padding-left: 28px;
+    width: 65%;
+  }
+}
+@media (max-width: 760px) {
+  .fullscreen .star-node {
+    width: 36px;
+    height: 36px;
+  }
+  .fullscreen .star-name {
+    left: 30px;
+  }
+  .campus-sky {
+    min-height: 650px;
+    margin-bottom: 28px;
+  }
+  .campus-night-art {
+    width: 100%;
+    height: 67%;
+    top: auto;
+    object-position: 70% bottom;
+  }
+  .campus-sky:before {
+    background: linear-gradient(
+      180deg,
+      #111b2b 0%,
+      #111b2b 28%,
+      #111b2bc2 44%,
+      #111b2b05 72%,
+      #111b2b65 100%
+    );
+  }
+  .campus-sky-copy {
+    width: 100%;
+    padding: 20px 22px;
+  }
+  .campus-sky-copy > .text-button:first-child {
+    margin-bottom: 28px;
+    font-size: 10px;
+  }
+  .campus-sky h1 {
+    font-size: 27px;
+    letter-spacing: 1px;
+  }
+  .campus-sky h1 > span {
+    font-size: 20px;
+    letter-spacing: 5px;
+  }
+  .campus-sky-description {
+    font-size: 11px;
+  }
+  .campus-profile-link {
+    margin-top: 15px;
+  }
+  .campus-sky-meta {
+    font-size: 9px;
+    gap: 10px;
+  }
+  .campus-coordinate {
+    margin-top: 17px;
+  }
+  .campus-sky-caption {
+    font-size: 8px;
+    right: 16px;
+    bottom: 14px;
+    letter-spacing: 1px;
+  }
+  .sky-motion-toggle {
+    top: auto;
+    bottom: 45px;
+    right: 14px;
+  }
+  .meteor-field {
+    inset: 25% 0 18% 0;
+  }
+  .campus-board-layout {
+    grid-template-columns: 1fr;
+  }
+  .campus-board-heading {
+    align-items: flex-start;
+  }
+  .campus-board-heading h2 {
+    font-size: 21px;
+  }
+  .campus-board-heading .muted {
+    max-width: 70px;
+    line-height: 1.8;
+  }
+  .campus-information {
+    grid-template-columns: 1fr;
+  }
+  .campus-board .echo-wall {
+    grid-template-columns: 1fr;
+  }
+  .campus-board .toolbar .wide-input {
+    flex-basis: 100%;
+  }
+  .atlas-echo-entry {
+    padding: 0 17px 17px;
+  }
+  .sailing-status {
+    bottom: 25px;
+    padding: 12px;
+    gap: 9px;
+    width: calc(100% - 32px);
+  }
+  .sailing-status strong {
+    font-size: 10px;
+    white-space: normal;
+  }
+  .sailing-status .text-button {
+    margin-left: auto;
+    font-size: 9px;
+  }
+  .sailing-status > svg {
+    display: none;
+  }
+  .sailing-position {
+    width: 100px;
+    height: 100px;
+  }
+  .rowing-wake {
+    left: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meteor-field,
+  .rowing-wake {
+    display: none;
+  }
+}

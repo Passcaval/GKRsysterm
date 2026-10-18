@@ -1,0 +1,9 @@
+node_modules/
+.pnpm-store/
+dist/
+.env.local
+tmp/
+*.tsbuildinfo
+夜航-交互预览.html
+__pycache__/
+*.py[cod]

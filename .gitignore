@@ -1,0 +1,20 @@
+# Local dependencies and build output
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+*.tsbuildinfo
+tmp/
+*.log
+
+# Local configuration and Python caches
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Generated standalone preview (rebuild with pnpm run standalone)
+src/frontend/夜航-交互预览.html
