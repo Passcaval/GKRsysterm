@@ -12,8 +12,9 @@ import {
   MessagesSquare,
   Navigation,
 } from "lucide-react";
-import { useApp } from "../store";
 import { isMock } from "../api";
+import { api } from "../api";
+import { useApp } from "../store";
 import { SectionTitle, SignalBadge, LinkButton } from "../components";
 import { classify, rankPosition, tierSymbol } from "../domain";
 import type { School } from "../types";
@@ -41,6 +42,23 @@ export function StarMap({
 }) {
   const { data, navigate } = useApp();
   const [zoom, setZoom] = useState(1);
+  const [dockedInfo, setDockedInfo] = useState<School | null>(null);
+  useEffect(() => {
+    let active = true;
+    if (dockedSchoolId)
+      api
+        .school(dockedSchoolId)
+        .then((s) => {
+          if (active) setDockedInfo(s);
+        })
+        .catch(() => {
+          if (active) setDockedInfo(null);
+        });
+    else setDockedInfo(null);
+    return () => {
+      active = false;
+    };
+  }, [dockedSchoolId]);
   const root = useRef<HTMLDivElement>(null);
   const frame = useRef<number | null>(null);
   useEffect(
@@ -76,11 +94,18 @@ export function StarMap({
         });
     });
   }
-  const rank = data.profile?.rank ?? (isMock ? 23500 : 0);
-  const docked = data.schools.find((s) => s.id === dockedSchoolId);
+  const rank = data.profile?.rank ?? null;
+  const mapTier = (s: School) =>
+    isMock ? classify(rank, s.rank) : s.historicalRisk || "unknown";
+  const coordinate = (s: School) =>
+    isMock ? rankPosition(s.rank, ranks) : s.x;
+  const docked =
+    dockedInfo ||
+    schools.find((s) => s.id === dockedSchoolId) ||
+    data.schools.find((s) => s.id === dockedSchoolId);
   const ranks = data.schools.map((s) => s.rank);
   const boatPosition = {
-    x: docked || rank ? rankPosition(docked?.rank ?? rank, ranks) : 50,
+    x: docked ? coordinate(docked) : isMock ? rankPosition(rank, ranks) : 50,
     y: docked?.y ?? 82,
   };
   return (
@@ -104,7 +129,7 @@ export function StarMap({
         <span>
           {data.profile?.province || "未设省份"} ·{" "}
           {data.profile?.subjects.map((s) => s[0]).join("") || "选科待补充"} ·
-          {isMock ? "示例分布" : "历史资料分布"}
+          {isMock ? "示例分布" : "探索布局"}
         </span>
       </div>
       <div className="map-body">
@@ -127,7 +152,7 @@ export function StarMap({
           {sailingTo && (
             <RowingVoyage
               from={boatPosition}
-              to={{ x: rankPosition(sailingTo.rank, ranks), y: sailingTo.y }}
+              to={{ x: coordinate(sailingTo), y: sailingTo.y }}
               onArrive={() => onArrive?.()}
             />
           )}
@@ -138,33 +163,28 @@ export function StarMap({
               top: `${boatPosition.y}%`,
             }}
             onClick={() => navigate("/profile")}
-            aria-label={`你的船，${docked ? `停靠${docked.name}` : rank ? `省内位次${rank.toLocaleString()}` : "尚未填写位次"}；点击修改考生档案`}
+            aria-label={`你的船，${docked ? `停靠${docked.name}` : `省内位次${rank?.toLocaleString() ?? "未填写位次"}`}；点击修改考生档案`}
           >
             <span className="boat-ripple" aria-hidden="true" />
             <img src={voyagerTop} alt="俯视下坐在船上、手持星图的航海者" />
             <span className="position-label">
               {docked ? "已停靠" : "你的位置"}{" "}
-              <b>
-                {docked?.name ?? (rank ? rank.toLocaleString() : "待填写位次")}
-              </b>
+              <b>{docked?.name ?? rank?.toLocaleString() ?? "未填写位次"}</b>
             </span>
           </button>
           {schools.map((s) => (
             <button
-              className={`star-node ${isMock ? classify(rank, s.rank) : "unknown"} ${selectedSchoolId === s.id ? "selected" : ""}`}
+              className={`star-node ${mapTier(s)} ${selectedSchoolId === s.id ? "selected" : ""}`}
               data-school-id={s.id}
               style={{
-                left: `${rankPosition(
-                  s.rank,
-                  data.schools.map((x) => x.rank),
-                )}%`,
+                left: `${coordinate(s)}%`,
                 top: `${s.y}%`,
               }}
               key={s.id}
               onClick={() =>
                 onSelect ? onSelect(s) : navigate("/school/" + s.id)
               }
-              aria-label={`查看${s.name}，${isMock ? "示例" : "历史"}位次${s.rank}`}
+              aria-label={`查看${s.name}，${isMock ? "示例" : "历史"}位次${s.rank ?? "待确认"}`}
               aria-pressed={onSelect ? selectedSchoolId === s.id : undefined}
             >
               <span className="star-glow">
@@ -172,11 +192,11 @@ export function StarMap({
               </span>
               <span className="star-name">
                 <span className="map-tier" aria-hidden="true">
-                  {tierSymbol[isMock ? classify(rank, s.rank) : "unknown"]}
+                  {tierSymbol[mapTier(s)]}
                 </span>{" "}
                 {s.name}
                 <small>
-                  {s.city} · {s.rank.toLocaleString()}
+                  {s.city} · {s.rank?.toLocaleString() ?? "待确认"}
                 </small>
               </span>
             </button>
@@ -188,21 +208,15 @@ export function StarMap({
               ← 相对稳妥 <span>示例历史录取位次</span> 更有挑战 →
             </>
           ) : (
-            <span>历史位次参考，须核对专业与统计口径</span>
+            <span>位置仅用于浏览；报考风险以招生单位的同口径历史为准</span>
           )}
         </div>
       </div>
       <div className="map-bottom">
         <div className="legend">
-          {isMock ? (
-            <>
-              <span className="safe">■ 保底探索</span>
-              <span className="match">● 稳妥选择</span>
-              <span className="reach">▲ 勇敢一试</span>
-            </>
-          ) : (
-            <span>◇ 条件与历史可比性待核对</span>
-          )}
+          <span className="safe">■ 保底探索</span>
+          <span className="match">● 稳妥选择</span>
+          <span className="reach">▲ 勇敢一试</span>
         </div>
         {!small && (
           <div className="zoom">
@@ -341,12 +355,14 @@ export function Home({ openChat }: { openChat: () => void }) {
             <>
               <div className="score-row">
                 <div>
-                  <strong>{data.profile.score}</strong>
+                  <strong>{data.profile.score ?? "待补充"}</strong>
                   <small>高考分数</small>
                 </div>
                 <span />
                 <div>
-                  <strong>{data.profile.rank.toLocaleString()}</strong>
+                  <strong>
+                    {data.profile.rank?.toLocaleString() ?? "待补充"}
+                  </strong>
                   <small>全省位次</small>
                 </div>
               </div>

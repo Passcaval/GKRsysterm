@@ -1,3 +1,4 @@
+import Routes from "./RunRoutes";
 import { useEffect, useState } from "react";
 import {
   ArrowRight,
@@ -24,206 +25,6 @@ import {
   Empty,
 } from "../components";
 import type { PlanEntry, Recommendation, Simulation, Tier } from "../types";
-function Routes() {
-  const { data, navigate, notify } = useApp();
-  const [risk, setRisk] = useState(50);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [evidence, setEvidence] = useState<string[] | null>(null);
-  const [why, setWhy] = useState("");
-  const [explanation, setExplanation] = useState("");
-  useEffect(() => {
-    let active = true;
-    setBusy(true);
-    const t = setTimeout(() => {
-      api
-        .recommendations(risk)
-        .then((v) => {
-          if (active) {
-            setRecommendations(v);
-            setError("");
-          }
-        })
-        .catch((e) => {
-          if (active) setError(e.message);
-        })
-        .finally(() => {
-          if (active) setBusy(false);
-        });
-    }, 300);
-    return () => {
-      active = false;
-      clearTimeout(t);
-    };
-  }, [risk, data.profile]);
-  return (
-    <>
-      <PageTitle
-        eyebrow="A ROUTE WITH REASONS"
-        title="每一条航线，都通向可能"
-        description="冲一冲，稳一稳，也为自己留一个安心的港口。所有推荐都应该说得清依据。"
-      />
-      <div className="risk-control panel">
-        <div>
-          <h3>你的选择节奏</h3>
-          <p>调整偏好，重新探索适合你的选择。</p>
-        </div>
-        <label>
-          <span>更稳妥</span>
-          <input
-            type="range"
-            aria-label="风险偏好"
-            min="0"
-            max="100"
-            value={risk}
-            onChange={(e) => setRisk(Number(e.target.value))}
-          />
-          <span>更有挑战</span>
-          <output>{risk}</output>
-        </label>
-      </div>
-      {busy && (
-        <p role="status" className="muted">
-          正在更新推荐航线…
-        </p>
-      )}
-      {error ? (
-        <Empty
-          text={error}
-          action="完善考生档案"
-          onAction={() => navigate("/profile")}
-        />
-      ) : recommendations.length === 0 && !busy ? (
-        <Empty text="当前没有可展示的候选，请核对数据覆盖范围、报考条件与官方资料。" />
-      ) : null}
-      {!error &&
-        (
-          (isMock
-            ? ["reach", "match", "safe"]
-            : ["unknown", "reach", "match", "safe"]) as Tier[]
-        ).map((t) => (
-          <section className={`route-lane ${t}`} key={t}>
-            <div className="route-lane-title">
-              <span>{tierSymbol[t]}</span>
-              <div>
-                <h2>
-                  {tierLabel[t]}
-                  {t === "unknown"
-                    ? " · 补充依据后再判断"
-                    : t === "reach"
-                      ? " · 向热爱靠近"
-                      : t === "match"
-                        ? " · 与期待相逢"
-                        : " · 给未来一份安心"}
-                </h2>
-                <p>
-                  {t === "unknown"
-                    ? "条件或历史可比性尚待确认，不能视为已满足报考要求"
-                    : t === "reach"
-                      ? "存在较大位次挑战，谨慎评估"
-                      : t === "match"
-                        ? "参考历史位次，继续核验当年计划"
-                        : "仍有政策与计划变化风险"}
-                </p>
-              </div>
-              <span className="muted">
-                {recommendations.filter((r) => r.tier === t).length} 个选择
-              </span>
-            </div>
-            <div className="school-grid">
-              {recommendations
-                .filter((r) => r.tier === t)
-                .map((r) => {
-                  const s = data.schools.find((s) => s.id === r.schoolId);
-                  return s ? (
-                    <div className="recommendation" key={s.id + ":" + r.major}>
-                      <SchoolCard school={s} compact tier={r.tier} />
-                      <div className="recommendation-reasons">
-                        <span className="source-tag inference">
-                          {r.matchScore === null
-                            ? "偏好匹配度待补充"
-                            : `偏好匹配度 ${r.matchScore}/100`}{" "}
-                          · 非录取概率
-                        </span>
-                        <p>{r.reasons.join("；")}</p>
-                        {r.postIds.length > 0 && (
-                          <button
-                            className="text-button"
-                            onClick={() => navigate("/post/" + r.postIds[0])}
-                          >
-                            参考 {r.postIds.length} 篇强信号回声
-                            <ArrowRight size={12} />
-                          </button>
-                        )}
-                        <button
-                          className="text-button"
-                          onClick={() => setEvidence(r.sourceIds)}
-                        >
-                          查看推荐依据
-                          <ArrowRight size={13} />
-                        </button>
-                        <details>
-                          <summary>风险与适用范围</summary>
-                          {r.warnings.map((w) => (
-                            <p key={w}>{w}</p>
-                          ))}
-                        </details>
-                      </div>
-                    </div>
-                  ) : null;
-                })}
-            </div>
-            {!recommendations.some((r) => r.tier === t) && !busy && (
-              <p className="muted">当前偏好下暂无此层次推荐。</p>
-            )}
-          </section>
-        ))}
-      <div className="panel explain-panel">
-        <h3>为什么没有推荐我心里的那所学校？</h3>
-        <p className="muted">把限制条件讲清楚，也是推荐的一部分。</p>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            try {
-              const v = await api.explanation(why);
-              setExplanation(v.text);
-            } catch (e) {
-              notify((e as Error).message);
-            }
-          }}
-        >
-          <select
-            required
-            aria-label="选择要解释的院校"
-            value={why}
-            onChange={(e) => setWhy(e.target.value)}
-          >
-            <option value="">选择院校</option>
-            {data.schools.map((s) => (
-              <option value={s.id} key={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <button className="button">
-            查看原因
-            <ArrowRight size={15} />
-          </button>
-        </form>
-        {explanation && <p className="explanation">{explanation}</p>}
-      </div>
-      {evidence && (
-        <Modal
-          title="推荐依据 · 数据与推断分别标注"
-          onClose={() => setEvidence(null)}
-        >
-          <Evidence ids={evidence} />
-        </Modal>
-      )}
-    </>
-  );
-}
 function Compare() {
   const { data, navigate, notify } = useApp();
   const [ids, setIds] = useState<string[]>(() => {
@@ -312,11 +113,13 @@ function Compare() {
                 ["院校层次", ...schools.map((s) => s.level)],
                 [
                   "2025示例位次",
-                  ...schools.map((s) => s.rank.toLocaleString()),
+                  ...schools.map((s) => s.rank?.toLocaleString() ?? "待确认"),
                 ],
                 [
                   "学费 / 年",
-                  ...schools.map((s) => `¥ ${s.tuition.toLocaleString()}`),
+                  ...schools.map(
+                    (s) => `¥ ${s.tuition?.toLocaleString() ?? "待确认"}`,
+                  ),
                 ],
                 [
                   "示例选科",
@@ -417,7 +220,8 @@ function Workbench() {
       </PageTitle>
       <div className="toolbar no-print">
         <span className="muted">
-          已编排 {data.plan.entries.length} 个志愿 · 演示上限 40
+          已编排 {data.plan.entries.length} 个志愿 · 上限{" "}
+          {data.plan.maxEntries ?? "待后端配置"}
         </span>
         <div className="spacer" />
         <button
@@ -480,37 +284,51 @@ function Workbench() {
                 </span>
                 <div className="plan-info">
                   <h3>
-                    {s?.name || "已失效院校"}{" "}
+                    {s?.name || `院校 ${e.schoolId}`}{" "}
                     {s && (
                       <TierBadge
                         tier={
                           isMock
-                            ? classify(data.profile?.rank || 23500, s.rank)
-                            : "unknown"
+                            ? classify(data.profile?.rank ?? null, s.rank)
+                            : (s.historicalRisk ?? "unknown")
                         }
                       />
                     )}
                   </h3>
-                  <label>
-                    <span className="sr-only">{s?.name}专业</span>
-                    <select
-                      disabled={busy}
-                      value={e.major}
-                      onChange={(event) =>
-                        void save(
-                          data.plan.entries.map((x) =>
-                            x.id === e.id
-                              ? { ...x, major: event.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    >
-                      {s?.majors.map((m) => (
-                        <option key={m}>{m}</option>
-                      ))}
-                    </select>
-                  </label>
+                  {isMock ? (
+                    <label>
+                      <span className="sr-only">{s?.name}专业</span>
+                      <select
+                        disabled={busy}
+                        value={e.major}
+                        onChange={(event) =>
+                          void save(
+                            data.plan.entries.map((x) =>
+                              x.id === e.id
+                                ? { ...x, major: event.target.value }
+                                : x,
+                            ),
+                          )
+                        }
+                      >
+                        {s?.majors.map((m) => (
+                          <option key={m}>{m}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : (
+                    <div>
+                      <p>
+                        {e.major} · 招生单位 {e.admissionUnitId || "待补充"}
+                      </p>
+                      <button
+                        className="text-button"
+                        onClick={() => navigate("/school/" + e.schoolId)}
+                      >
+                        查看院校并核对专业条件
+                      </button>
+                    </div>
+                  )}
                   <label className="switch-label">
                     <input
                       disabled={busy}
@@ -596,9 +414,11 @@ function Workbench() {
           {simulation && (
             <div className="simulation-result">
               <h3>
-                {simulation.eligible
-                  ? "✓ 示例选科条件通过"
-                  : "存在不满足的报考条件"}
+                {simulation.eligible === null
+                  ? "条件待确认"
+                  : simulation.eligible
+                    ? "✓ 示例选科条件通过"
+                    : "存在不满足的报考条件"}
               </h3>
               <p>{simulation.assessment}</p>
               <small>参考数据年份：{simulation.basisYear}</small>
@@ -611,18 +431,14 @@ function Workbench() {
             </div>
           )}
           <div className="distribution">
-            {(
-              (isMock
-                ? ["reach", "match", "safe"]
-                : ["unknown", "reach", "match", "safe"]) as Tier[]
-            ).map((t) => {
+            {(["reach", "match", "safe"] as Tier[]).map((t) => {
               const count = data.plan.entries.filter((e) => {
                 const s = data.schools.find((s) => s.id === e.schoolId);
                 return (
-                  s &&
+                  !!s &&
                   (isMock
-                    ? classify(data.profile?.rank || 23500, s.rank)
-                    : "unknown") === t
+                    ? classify(data.profile?.rank ?? null, s.rank)
+                    : (s.historicalRisk ?? "unknown")) === t
                 );
               }).length;
               return (

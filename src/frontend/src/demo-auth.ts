@@ -47,5 +47,18 @@ export function authenticateDemo(input: LoginInput): User | null {
       ? item.email === input.identifier.toLowerCase()
       : item.userId === input.identifier,
   );
-  return account ? { ...account.user } : null;
+  return account
+    ? {
+        ...account.user,
+        userId: account.userId,
+        email: account.email,
+        emailVerified: false,
+        permissions:
+          account.user.role === "admin"
+            ? ["registration:review", "verification:review", "content:review"]
+            : account.user.role === "reviewer"
+              ? ["content:review"]
+              : [],
+      }
+    : null;
 }

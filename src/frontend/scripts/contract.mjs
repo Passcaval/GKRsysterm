@@ -1,266 +1,578 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+const ref = (name) => ({ $ref: "#/components/schemas/" + name });
 const str = (extra = {}) => ({ type: "string", ...extra });
+const num = (extra = {}) => ({ type: "number", ...extra });
 const int = (extra = {}) => ({ type: "integer", ...extra });
 const bool = { type: "boolean" };
 const arr = (items) => ({ type: "array", items });
-const obj = (properties, required = Object.keys(properties)) => ({
+const nullable = (s) => ({ anyOf: [s, { type: "null" }] });
+const en = (values) => str({ enum: values });
+const obj = (properties, required = Object.keys(properties), extra = {}) => ({
   type: "object",
-  additionalProperties: false,
   properties,
   required,
+  additionalProperties: true,
+  ...extra,
 });
-const nullable = (schema) => ({ anyOf: [schema, { type: "null" }] });
-const en = (values) => str({ enum: values });
+const input = (properties, required = Object.keys(properties)) =>
+  obj(properties, required, { additionalProperties: false });
+const id = str({ minLength: 1 });
+const strings = arr(str());
+const date = str({ format: "date-time" });
+const statuses = [
+  "queued",
+  "running",
+  "waiting_input",
+  "validating",
+  "succeeded",
+  "partial",
+  "failed",
+  "cancelled",
+];
+const profileFields = {
+  province_code: nullable(str()),
+  exam_year: int({ minimum: 2024, maximum: 2035 }),
+  exam_category: str(),
+  subjects: { ...strings, uniqueItems: true, maxItems: 3 },
+  score: nullable(int({ minimum: 0, maximum: 900 })),
+  rank: nullable(int({ minimum: 1, maximum: 5000000 })),
+  rank_cohort: nullable(str()),
+  budget: obj({
+    amount: nullable(num({ minimum: 0 })),
+    currency: en(["CNY"]),
+    period: en(["year"]),
+    scope: en(["tuition", "total"]),
+  }),
+  preferred_regions: strings,
+  preferred_majors: strings,
+  accept_adjustment: bool,
+  consent: bool,
+  preferences: arr(
+    obj({
+      field: str(),
+      value: str(),
+      strength: en(["hard", "soft"]),
+      priority: int({ minimum: 1 }),
+    }),
+  ),
+};
+const applicationFields = {
+  application_id: id,
+  reserved_user_id: id,
+  status: en(["pending", "approved", "rejected"]),
+  version: int({ minimum: 1 }),
+  nickname: str(),
+  email: str(),
+  created_at: date,
+  reviewed_at: nullable(date),
+  reason: nullable(str()),
+  evidence_text: str(),
+  has_audio: bool,
+};
 const schemas = {
   User: obj({
-    id: str(),
-    name: str(),
+    id,
+    user_id: id,
+    nickname: str(),
+    email: str(),
+    email_verified: bool,
     role: en(["student", "contributor", "reviewer", "admin"]),
-    verified: bool,
+    student_verified: bool,
+    permissions: strings,
   }),
   Profile: obj({
-    province: str({ description: "生源省份中文简称，如浙江" }),
-    year: int({ minimum: 2024, maximum: 2035 }),
-    score: int({
-      minimum: 0,
-      maximum: 900,
-      description: "省份特定满分与赋分要求由后端校验",
-    }),
-    rank: int({ minimum: 1, maximum: 5000000 }),
-    subjects: { ...arr(str()), minItems: 3, maxItems: 3, uniqueItems: true },
-    cities: arr(str()),
-    interests: arr(str()),
-    budget: int({ minimum: 0 }),
-    acceptAdjustment: bool,
-    consent: { type: "boolean", const: true },
+    ...profileFields,
+    version: int({ minimum: 1 }),
+    profile_version_id: id,
   }),
-  Source: obj({
-    id: str(),
-    kind: en(["official", "experience", "inference"]),
-    title: str(),
-    url: nullable(
-      str({
-        format: "uri",
-        description: "真实官方来源必须给出原文 HTTPS URL；演示可为 null",
-      }),
-    ),
-    year: int(),
-    retrievedAt: str({ format: "date-time" }),
-    excerpt: str(),
+  ProfilePatch: input(
+    { ...profileFields, expected_version: int({ minimum: 0 }) },
+    ["expected_version"],
+  ),
+  ProfileParse: obj({
+    proposed_changes: obj(profileFields, []),
+    missing_fields: strings,
+    questions: strings,
   }),
-  School: obj({
-    id: str(),
-    name: str(),
-    short: str(),
-    city: str(),
-    province: str(),
-    level: str(),
-    type: str(),
-    rank: int({
-      minimum: 1,
-      description: "仅可同省、同批次、同选科、同专业组比较的历史位次",
-    }),
-    tuition: int({ minimum: 0 }),
-    majors: arr(str()),
-    requiredSubjects: arr(str()),
-    description: str(),
-    color: str({ pattern: "^#[0-9a-fA-F]{6}$" }),
-    x: { type: "number", minimum: 0, maximum: 100 },
-    y: { type: "number", minimum: 0, maximum: 100 },
-    sourceIds: arr(str()),
-    history: arr(obj({ year: int(), rank: int(), score: int() })),
-  }),
+  ProfileParseInput: input({ text: str({ minLength: 1, maxLength: 10000 }) }),
+  Source: obj(
+    {
+      id,
+      kind: en(["official", "experience", "inference"]),
+      title: str(),
+      url: nullable(str({ format: "uri" })),
+      year: int(),
+      retrieved_at: date,
+      excerpt: str(),
+      version: nullable(str()),
+      locator: nullable(str()),
+      content_hash: nullable(str()),
+      support_status: en(["supported", "refuted", "unverified", "withdrawn"]),
+      freshness: en(["current", "expired", "unknown"]),
+      scope: nullable(str()),
+    },
+    ["id", "kind", "title", "url", "year", "retrieved_at", "excerpt"],
+  ),
+  School: obj(
+    {
+      id,
+      name: str(),
+      short: str(),
+      city: str(),
+      province: str(),
+      level: str(),
+      type: str(),
+      rank: nullable(int({ minimum: 1 })),
+      tuition: nullable(num({ minimum: 0 })),
+      majors: strings,
+      required_subjects: strings,
+      description: str(),
+      color: str(),
+      x: num({ minimum: 0, maximum: 100 }),
+      y: num({ minimum: 0, maximum: 100 }),
+      source_ids: strings,
+      history: arr(obj({ year: int(), rank: int(), score: num() })),
+      historical_risk: en(["reach", "match", "safe", "unknown"]),
+      data_version: nullable(str()),
+    },
+    [
+      "id",
+      "name",
+      "short",
+      "city",
+      "province",
+      "level",
+      "type",
+      "rank",
+      "tuition",
+      "majors",
+      "required_subjects",
+      "description",
+      "color",
+      "x",
+      "y",
+      "source_ids",
+      "history",
+    ],
+  ),
   Trust: obj({
-    identity: {
-      ...int({ minimum: 0, maximum: 100 }),
-      type: ["integer", "null"],
-    },
-    specificity: {
-      ...int({ minimum: 0, maximum: 100 }),
-      type: ["integer", "null"],
-    },
-    corroboration: {
-      ...int({ minimum: 0, maximum: 100 }),
-      type: ["integer", "null"],
-    },
-    freshness: {
-      ...int({ minimum: 0, maximum: 100 }),
-      type: ["integer", "null"],
-    },
-    anomaly: {
-      ...int({
-        minimum: 0,
-        maximum: 100,
-        description: "越高表示异常安全度越高，非异常概率",
-      }),
-      type: ["integer", "null"],
-    },
+    identity: nullable(num({ minimum: 0, maximum: 100 })),
+    specificity: nullable(num({ minimum: 0, maximum: 100 })),
+    corroboration: nullable(num({ minimum: 0, maximum: 100 })),
+    freshness: nullable(num({ minimum: 0, maximum: 100 })),
+    anomaly: nullable(num({ minimum: 0, maximum: 100 })),
     supporting: int({ minimum: 0 }),
     opposing: int({ minimum: 0 }),
-    explanation: { ...arr(str()), minItems: 5, maxItems: 5 },
-    expiresAt: str({ format: "date" }),
+    explanation: strings,
+    expires_at: str(),
     version: str(),
   }),
-  Post: obj({
-    isMine: bool,
-    id: str(),
-    schoolId: str(),
-    title: str(),
-    excerpt: str(),
-    body: str(),
-    topic: str(),
-    author: str({ description: "脱敏展示名，不能包含实名、学号或联系方式" }),
-    year: int(),
-    signal: en(["strong", "medium", "weak", "disputed"]),
-    helpful: int({ minimum: 0 }),
-    citations: int({ minimum: 0 }),
-    status: en(["published", "pending", "rejected"]),
-    trust: ref("Trust"),
-    sourceIds: arr(str()),
-  }),
-  Recommendation: obj({
-    schoolId: str(),
-    major: str(),
-    tier: en(["reach", "match", "safe", "unknown"]),
-    matchScore: {
-      ...int({
-        minimum: 0,
-        maximum: 100,
-        description: "偏好匹配度，不得当作录取概率；缺少偏好时为 null",
-      }),
-      type: ["integer", "null"],
-    },
-    reasons: arr(str()),
-    warnings: arr(str()),
-    sourceIds: arr(str()),
-    postIds: arr(str()),
-  }),
-  PlanEntry: obj({
-    id: str(),
-    schoolId: str(),
-    major: str(),
-    adjustment: bool,
-  }),
-  Plan: obj({
-    id: str(),
-    version: int({ minimum: 1 }),
-    name: str(),
-    entries: { ...arr(ref("PlanEntry")), maxItems: 40 },
-  }),
-  Simulation: obj({
-    eligible: bool,
-    warnings: arr(str()),
-    assessment: str(),
-    basisYear: int(),
-    probabilities: {
-      type: "null",
-      description: "v0.1 不提供未经校准的录取概率",
-    },
-  }),
-  Verification: obj({
-    id: str(),
-    status: en(["pending", "approved", "rejected"]),
-    schoolId: str(),
-    submittedAt: str({ format: "date-time" }),
-  }),
-  Error: obj({
-    error: obj(
-      {
-        code: str(),
-        message: str(),
-        details: arr(obj({ field: str(), message: str() })),
-      },
-      ["code", "message"],
-    ),
-    requestId: str(),
-  }),
-  LoginRequest: obj({
-    login_type: en(["email", "user_id"]),
-    identifier: str({ minLength: 1, maxLength: 254 }),
-    password: str({ minLength: 1, maxLength: 256 }),
-  }),
-  PostInput: obj({
-    schoolId: str(),
-    topic: str(),
-    title: str({ minLength: 5, maxLength: 80 }),
-    body: str({ minLength: 80, maxLength: 10000 }),
-  }),
-  FeedbackInput: obj(
-    {
-      kind: en(["helpful", "disagree", "appeal"]),
-      reason: str({ maxLength: 2000 }),
-    },
-    ["kind"],
-  ),
-  ReviewInput: obj({
-    decision: en(["approve", "reject"]),
-    reason: str({ minLength: 5, maxLength: 2000 }),
-  }),
-  ChatRequest: obj(
-    { message: str({ minLength: 1, maxLength: 4000 }), conversationId: str() },
-    ["message"],
-  ),
-  ChatEvent: {
-    oneOf: [
-      ...["tool_start", "tool_end"].map((type) =>
-        obj({
-          type: { const: type, type: "string" },
-          tool: str(),
-          text: str(),
-        }),
-      ),
-      obj({ type: { const: "delta", type: "string" }, text: str() }),
+  Claim: obj({
+    id,
+    text: str(),
+    source_version: nullable(str()),
+    support_status: en(["supported", "refuted", "unverified", "withdrawn"]),
+    freshness: en(["current", "expired", "unknown"]),
+    scope: nullable(str()),
+    relations: arr(
       obj({
-        type: { const: "evidence", type: "string" },
-        sourceIds: arr(str()),
+        evidence_id: id,
+        relation: en(["supports", "refutes", "background"]),
       }),
-      obj({ type: { const: "done", type: "string" }, conversationId: str() }),
-      obj({ type: { const: "error", type: "string" }, text: str() }),
-    ],
-  },
-};
-schemas.Bootstrap = obj({
-  user: nullable(ref("User")),
-  profile: nullable(ref("Profile")),
-  schools: arr(ref("School")),
-  posts: arr(ref("Post")),
-  sources: arr(ref("Source")),
-  plan: ref("Plan"),
-  favorites: arr(str()),
-  verifications: arr(ref("Verification")),
-});
-const envelope = (schema) => obj({ data: schema, requestId: str() });
-const json = (schema) => ({ "application/json": { schema } });
-const errors = Object.fromEntries(
-  [400, 401, 403, 404, 409, 413, 415, 422, 429, 500, 503].map((status) => [
-    status,
+    ),
+  }),
+  Post: obj(
     {
-      description:
-        {
-          401: "会话过期或未登录",
-          403: "权限不足",
-          409: "版本冲突",
-          422: "字段或省份规则校验失败",
-          429: "限流",
-        }[status] || "请求失败",
-      content: json(ref("Error")),
+      id,
+      school_id: id,
+      is_mine: bool,
+      title: str(),
+      excerpt: str(),
+      body: str(),
+      topic: str(),
+      author: str(),
+      year: int(),
+      signal: en(["strong", "medium", "weak", "disputed"]),
+      status: en(["pending", "published", "rejected"]),
+      helpful: int(),
+      citations: int(),
+      trust: ref("Trust"),
+      source_ids: strings,
+      version: int({ minimum: 1 }),
+      campus_id: nullable(str()),
+      major_id: nullable(str()),
+      experienced_at: nullable(str()),
+      visibility: en(["public", "private"]),
+      claims: arr(ref("Claim")),
     },
+    [
+      "id",
+      "school_id",
+      "is_mine",
+      "title",
+      "excerpt",
+      "body",
+      "topic",
+      "author",
+      "year",
+      "signal",
+      "status",
+      "helpful",
+      "citations",
+      "trust",
+      "source_ids",
+      "version",
+    ],
+  ),
+  PlanEntry: obj(
+    {
+      id,
+      school_id: id,
+      major: str(),
+      major_id: str(),
+      admission_unit_id: str(),
+      recommendation_item_id: str(),
+      province_code: str(),
+      exam_year: int(),
+      adjustment: bool,
+    },
+    ["id", "school_id", "major", "adjustment"],
+  ),
+  Plan: obj(
+    {
+      id,
+      version: int({ minimum: 0 }),
+      name: str(),
+      entries: arr(ref("PlanEntry")),
+      max_entries: nullable(int({ minimum: 1 })),
+    },
+    ["id", "version", "name", "entries"],
+  ),
+  Simulation: obj(
+    {
+      eligible: nullable(bool),
+      eligibility: obj({
+        status: en(["pass", "fail", "unknown"]),
+        reason: str(),
+      }),
+      warnings: strings,
+      assessment: str(),
+      basis_year: int(),
+      probabilities: { type: "null" },
+    },
+    ["eligible", "warnings", "assessment", "basis_year", "probabilities"],
+  ),
+  Verification: obj(
+    {
+      id,
+      school_id: id,
+      status: en(["pending", "approved", "rejected"]),
+      submitted_at: date,
+      version: int({ minimum: 1 }),
+    },
+    ["id", "school_id", "status", "submitted_at"],
+  ),
+  Bootstrap: obj({
+    user: nullable(ref("User")),
+    profile: nullable(ref("Profile")),
+    schools: arr(ref("School")),
+    posts: arr(ref("Post")),
+    sources: arr(ref("Source")),
+    plan: ref("Plan"),
+    favorites: strings,
+    verifications: arr(ref("Verification")),
+  }),
+  Login: input({
+    login_type: en(["email", "user_id"]),
+    identifier: str({ minLength: 1 }),
+    password: str({ minLength: 1 }),
+  }),
+  RegistrationInput: input(
+    {
+      nickname: str({
+        minLength: 1,
+        maxLength: 5,
+        pattern: "^[\\p{Unified_Ideograph}A-Za-z]{1,5}$",
+        description:
+          "NFC后按Unicode码点计数1–5，仅Unified_Ideograph或ASCII英文字母；后端必须复核",
+      }),
+      email: str({ maxLength: 254 }),
+      password: str({ minLength: 8, maxLength: 128 }),
+      evidence_text: str({
+        maxLength: 3000,
+        description: "最多3000个Unicode码点",
+      }),
+      evidence_audio: str({
+        format: "binary",
+        description: "原始音频，最多120秒及10MiB；服务端复核格式与实际时长",
+      }),
+    },
+    ["nickname", "email", "password"],
+  ),
+  RegistrationReceipt: obj({
+    application_id: id,
+    reserved_user_id: id,
+    status: { type: "string", const: "pending" },
+    status_token: str({ minLength: 16 }),
+  }),
+  RegistrationStatus: obj(applicationFields, [
+    "application_id",
+    "reserved_user_id",
+    "status",
+    "version",
+    "created_at",
+    "reason",
   ]),
-);
+  RegistrationDetail: obj(applicationFields, [
+    "application_id",
+    "reserved_user_id",
+    "status",
+    "version",
+    "nickname",
+    "email",
+    "created_at",
+    "reason",
+    "evidence_text",
+    "has_audio",
+  ]),
+  Decision: input({
+    decision: en(["approve", "reject"]),
+    reason: str(),
+    expected_version: int({ minimum: 1 }),
+  }),
+  Question: obj({ field: id, text: str(), required: bool }),
+  RecommendationItem: obj(
+    {
+      recommendation_item_id: id,
+      admission_unit_id: id,
+      school_id: id,
+      school_name: str(),
+      campus_id: nullable(str()),
+      major: str(),
+      eligibility: obj({
+        status: en(["pass", "fail", "unknown"]),
+        missing_requirements: strings,
+      }),
+      historical_risk: obj({
+        status: en(["reach", "match", "safe", "unknown"]),
+        reason: str(),
+      }),
+      preference_match: obj({
+        score: nullable(num({ minimum: 0, maximum: 100 })),
+        coverage: num({ minimum: 0, maximum: 1 }),
+        breakdown: arr(obj({ label: str(), score: nullable(num()) })),
+      }),
+      reasons: strings,
+      evidence_ids: strings,
+      warnings: strings,
+    },
+    [
+      "recommendation_item_id",
+      "admission_unit_id",
+      "school_id",
+      "campus_id",
+      "major",
+      "eligibility",
+      "historical_risk",
+      "preference_match",
+      "reasons",
+      "evidence_ids",
+      "warnings",
+    ],
+  ),
+  Run: obj({
+    run_id: id,
+    status: en(statuses),
+    version: int({ minimum: 1 }),
+    question: str(),
+    profile_version_id: nullable(str()),
+    original_profile_version_id: nullable(str()),
+    data_version: nullable(str()),
+    rule_version: nullable(str()),
+    created_at: date,
+    questions: arr(ref("Question")),
+    items: arr(ref("RecommendationItem")),
+    validation: obj({
+      status: en(["pending", "passed", "failed"]),
+      summary: str(),
+    }),
+    last_event_id: int({ minimum: 0 }),
+    summary: str(),
+    error: nullable(str()),
+  }),
+  RunAccepted: obj({ run_id: id, status: en(statuses) }, ["run_id", "status"]),
+  CreateRun: input({
+    question: str({ minLength: 1, maxLength: 4000 }),
+    profile_version_id: nullable(str()),
+    risk_preference: int({ minimum: 0, maximum: 100 }),
+    intent: en(["campus_life", "admission", "risk"]),
+  }),
+  RunAnswers: input({
+    expected_version: int({ minimum: 1 }),
+    answers: obj({}, [], { additionalProperties: str() }),
+  }),
+  RunCancel: input({ expected_version: int({ minimum: 1 }) }),
+  RunEvent: obj({
+    event_id: int({ minimum: 1 }),
+    event_type: en(["status", "question", "result", "error", "done"]),
+    run_id: id,
+    timestamp: date,
+    payload: obj({}, [], { additionalProperties: true }),
+  }),
+  RecommendationFeedback: input({
+    run_id: id,
+    recommendation_item_id: id,
+    kind: en(["preference", "correction"]),
+    reason: str({ minLength: 1, maxLength: 3000 }),
+  }),
+  Accepted: obj({ accepted: bool }),
+  PostInput: input(
+    {
+      school_id: id,
+      topic: str(),
+      title: str({ minLength: 5, maxLength: 200 }),
+      body: str({ minLength: 80, maxLength: 10000 }),
+      campus_id: nullable(str()),
+      major_id: nullable(str()),
+      experienced_at: nullable(str()),
+      visibility: en(["public", "private"]),
+      originality: en(["original"]),
+    },
+    ["school_id", "topic", "title", "body"],
+  ),
+  PostPatch: input(
+    {
+      title: str({ minLength: 5, maxLength: 200 }),
+      body: str({ minLength: 80, maxLength: 10000 }),
+      visibility: en(["public", "private"]),
+      expected_version: int({ minimum: 1 }),
+    },
+    ["expected_version"],
+  ),
+  ExpectedVersion: input({ expected_version: int({ minimum: 1 }) }),
+  PostFeedback: input(
+    { kind: en(["helpful", "disagree", "appeal"]), reason: str() },
+    ["kind", "reason"],
+  ),
+  AdmissionUnit: obj({
+    id,
+    school_id: id,
+    campus_id: nullable(str()),
+    campus_name: nullable(str()),
+    unit_type: str(),
+    province_code: str(),
+    exam_year: int(),
+    exam_category: str(),
+    batch: str(),
+    code: nullable(str()),
+    majors: arr(obj({ id, name: str() })),
+    required_subjects: strings,
+    data_version: str(),
+    source_ids: strings,
+  }),
+  UnitHistory: obj({
+    comparable: bool,
+    reason: str(),
+    items: arr(
+      obj({
+        year: int(),
+        unit_type: str(),
+        minimum_filing_rank: nullable(int()),
+        major_admission_rank: nullable(int()),
+        source_ids: strings,
+      }),
+    ),
+  }),
+  History: obj({
+    run_id: id,
+    question: str(),
+    status: en(statuses),
+    created_at: date,
+    profile_version_id: nullable(str()),
+  }),
+  Memory: obj({
+    id,
+    version: int({ minimum: 1 }),
+    field: str(),
+    value: str(),
+    confirmed: bool,
+  }),
+  MemoryPatch: input({
+    value: str(),
+    confirmed: { type: "boolean", const: true },
+    expected_version: int({ minimum: 1 }),
+  }),
+  Sharing: obj({ enabled: bool }),
+  Error: obj({
+    error: obj({
+      code: id,
+      message: str(),
+      details: obj({}, [], { additionalProperties: true }),
+    }),
+    request_id: id,
+  }),
+  ChatEvent: obj(
+    {
+      type: en([
+        "tool_start",
+        "tool_end",
+        "delta",
+        "evidence",
+        "done",
+        "error",
+      ]),
+      text: str(),
+      tool: str(),
+      source_ids: strings,
+      conversation_id: str(),
+    },
+    ["type"],
+  ),
+};
+const pageOf = (name) =>
+  obj({ items: arr(ref(name)), next_cursor: nullable(str()) });
+for (const name of [
+  "School",
+  "Post",
+  "AdmissionUnit",
+  "RegistrationDetail",
+  "Verification",
+])
+  schemas[name + "Page"] = pageOf(name);
 const paths = {};
+const json = (schema) => ({ "application/json": { schema } });
+const envelope = (schema) => obj({ data: schema, request_id: id });
+const errors = Object.fromEntries(
+  [400, 401, 403, 404, 409, 410, 413, 415, 422, 429, 500, 502, 503].map(
+    (status) => [
+      status,
+      {
+        description: "结构化错误：保留code、details、request_id",
+        content: json(ref("Error")),
+      },
+    ],
+  ),
+);
 function operation(
   path,
   method,
   summary,
-  schema,
-  { input, publicAccess = false, form = false, description = "" } = {},
+  output,
+  {
+    body,
+    code = 200,
+    publicAccess = false,
+    form = false,
+    key = false,
+    headers = [],
+    query = [],
+  } = {},
 ) {
   const parameters = [...path.matchAll(/\{([^}]+)\}/g)].map((m) => ({
     name: m[1],
     in: "path",
     required: true,
-    schema: str(),
+    schema: id,
   }));
   if (method !== "get")
     parameters.push({
@@ -268,257 +580,417 @@ function operation(
       in: "header",
       required: true,
       schema: { type: "string", const: "NightVoyage" },
-      description:
-        "结合严格 Origin 白名单与 SameSite cookie 校验 CSRF。文件上传也必须携带。",
     });
+  if (key)
+    parameters.push({
+      name: "Idempotency-Key",
+      in: "header",
+      required: true,
+      schema: id,
+      description:
+        "同账号、同路径、同键同内容重试返回同一业务对象；不同内容409",
+    });
+  for (const name of headers)
+    parameters.push({
+      name,
+      in: "header",
+      required: name === "X-Application-Token",
+      schema: str(),
+    });
+  for (const name of query)
+    parameters.push({ name, in: "query", required: false, schema: str() });
   paths[path] ??= {};
   paths[path][method] = {
     operationId: method + "_" + path.replace(/[^a-zA-Z0-9]/g, "_"),
     summary,
-    description,
     security: publicAccess ? [] : [{ session: [] }],
-    ...(parameters.length ? { parameters } : {}),
-    ...(input
+    parameters,
+    ...(body
       ? {
           requestBody: {
             required: true,
             content: form
-              ? { "multipart/form-data": { schema: input } }
-              : json(input),
+              ? { "multipart/form-data": { schema: body } }
+              : json(body),
           },
         }
       : {}),
     responses: {
-      200: {
-        description: "成功，空操作也返回 JSON data:null，不使用 204",
-        content: json(envelope(schema)),
+      [code]: {
+        description: "成功；删除操作仍返回data:null，不使用204",
+        content: json(envelope(output)),
       },
       ...errors,
     },
   };
 }
-operation("/bootstrap", "get", "加载当前可见的初始视图", ref("Bootstrap"), {
+operation(
+  "/bootstrap",
+  "get",
+  "首屏聚合快照；不代表全量列表",
+  ref("Bootstrap"),
+  { publicAccess: true },
+);
+operation("/auth/login", "post", "邮箱或系统用户ID登录", ref("User"), {
+  body: ref("Login"),
   publicAccess: true,
-  description:
-    "v0.1 聚合快照。匿名返回公开院校与已发布帖子，个人字段为空；仅审核员可收到完整待审内容。所有 sourceIds 必须可解析。当前前端对快照做本地筛选，不适用于无限数据集合。",
 });
+operation("/auth/logout", "post", "撤销当前正式会话", { type: "null" });
+operation("/auth/me", "get", "本人正式会话", ref("User"));
 operation(
-  "/auth/login",
+  "/registration-applications",
   "post",
-  "统一登录：由服务端确定身份并设置 HttpOnly 安全会话",
-  ref("User"),
+  "提交注册申请，保持未登录",
+  ref("RegistrationReceipt"),
   {
-    input: ref("LoginRequest"),
+    body: ref("RegistrationInput"),
+    code: 202,
     publicAccess: true,
-    description:
-      "沿用统一登录请求。login_type仅为标识类型，不是校验结果或用户角色。后端独立校验邮箱或系统ID，格式不合格返回422，error.message须包含原因和重新输入提示；合法格式但认证失败返回统一401，不泄露账号是否存在。",
+    form: true,
+    key: true,
   },
 );
-paths["/auth/login"].post.responses[422] = {
-  description:
-    "后端校验标识失败；不签发会话。前端沿用现有错误展示，保留输入并允许修改重试。",
-  content: {
-    "application/json": {
-      schema: ref("Error"),
-      examples: {
-        invalidEmail: {
-          value: {
-            error: {
-              code: "EMAIL_INVALID",
-              message: "邮箱格式不正确，请重新输入。",
-              details: [
-                {
-                  field: "identifier",
-                  message: "请输入符合格式要求的邮箱地址",
-                },
-              ],
-            },
-            requestId: "req-email-invalid",
-          },
-        },
-        invalidIdentifier: {
-          value: {
-            error: {
-              code: "IDENTIFIER_INVALID",
-              message: "邮箱或用户 ID 格式不正确，请重新输入。",
-              details: [
-                {
-                  field: "identifier",
-                  message: "请输入有效邮箱或系统分配的用户 ID",
-                },
-              ],
-            },
-            requestId: "req-identifier-invalid",
-          },
-        },
-      },
-    },
-  },
+operation(
+  "/registration-applications/{application_id}",
+  "get",
+  "凭独立查询凭据获取申请状态",
+  ref("RegistrationStatus"),
+  { publicAccess: true, headers: ["X-Application-Token"] },
+);
+operation(
+  "/admin/registration-applications",
+  "get",
+  "注册管理员待审队列",
+  ref("RegistrationDetailPage"),
+  { query: ["status", "cursor"] },
+);
+operation(
+  "/admin/registration-applications/{application_id}",
+  "get",
+  "原始文字与音频证据详情，不返回密码及查询凭据",
+  ref("RegistrationDetail"),
+);
+operation(
+  "/admin/registration-applications/{application_id}/decision",
+  "post",
+  "批准普通账号或驳回释放待审占用",
+  ref("RegistrationDetail"),
+  { body: ref("Decision"), key: true },
+);
+operation(
+  "/admin/registration-applications/{application_id}/audio",
+  "get",
+  "受保护原始语音",
+  { type: "string" },
+);
+paths[
+  "/admin/registration-applications/{application_id}/audio"
+].get.responses[200] = {
+  description: "受会话与对象权限保护的原始音频；不套JSON信封",
+  content: { "audio/*": { schema: str({ format: "binary" }) } },
 };
-operation("/auth/logout", "post", "退出并吊销会话", { type: "null" });
-operation("/me/profile", "put", "完整替换考生档案", ref("Profile"), {
-  input: ref("Profile"),
+operation(
+  "/me/profile",
+  "get",
+  "当前画像和不可变版本标识",
+  nullable(ref("Profile")),
+);
+operation(
+  "/me/profile",
+  "patch",
+  "局部更新画像，未填分数/位次保持null",
+  ref("Profile"),
+  { body: ref("ProfilePatch") },
+);
+operation(
+  "/me/profile/parse",
+  "post",
+  "提取建议，等待用户确认",
+  ref("ProfileParse"),
+  { body: ref("ProfileParseInput") },
+);
+operation(
+  "/me/profile/versions",
+  "get",
+  "本人画像历史版本",
+  arr(ref("Profile")),
+);
+operation("/me/data", "delete", "清除可删除个人数据与共享授权", {
+  type: "null",
+});
+for (const method of ["put", "delete"])
+  operation("/me/favorites/{school_id}", method, "本人院校收藏", strings);
+operation("/schools", "get", "服务端院校分页检索", ref("SchoolPage"), {
+  publicAccess: true,
+  query: ["query", "city", "major", "cursor"],
+});
+operation("/schools/{school_id}", "get", "院校详情按ID读取", ref("School"), {
+  publicAccess: true,
 });
 operation(
-  "/me/data",
-  "delete",
-  "删除当前用户可删除的个人数据",
-  { type: "null" },
-  {
-    description:
-      "删除画像、收藏、志愿、认证材料与未发布投稿；已发布内容匿名化。法定保留的审计记录需告知。撤销未结束会话/任务。",
-  },
+  "/admission-units",
+  "get",
+  "按院校及招生口径读取招生单位",
+  ref("AdmissionUnitPage"),
+  { publicAccess: true, query: ["school_id", "cursor"] },
 );
-for (const method of ["put", "delete"])
-  operation(
-    "/me/favorites/{schoolId}",
-    method,
-    method === "put" ? "收藏院校（幂等）" : "取消收藏（幂等）",
-    arr(str()),
-  );
+operation(
+  "/admission-units/{unit_id}/history",
+  "get",
+  "区分投档最低位次与专业录取位次",
+  ref("UnitHistory"),
+  { publicAccess: true },
+);
 operation(
   "/recommendations",
   "post",
-  "按档案与风险偏好生成建议",
-  arr(ref("Recommendation")),
-  {
-    input: obj({ riskPreference: int({ minimum: 0, maximum: 100 }) }),
-    description:
-      "后端完成选科、学费、政策与省份条件校验，不兼容的高考模式返回422。不得仅用单篇弱信号帖子形成结论。",
-  },
+  "创建持久任务，仅返回任务句柄",
+  ref("RunAccepted"),
+  { body: ref("CreateRun"), code: 202, key: true },
 );
 operation(
-  "/recommendations/explain",
-  "post",
-  "解释院校被排除或纳入的原因",
-  obj({ text: str(), sourceIds: arr(str()) }),
-  { input: obj({ schoolId: str() }) },
+  "/recommendations/{run_id}",
+  "get",
+  "任务状态与已校验结果",
+  ref("Run"),
 );
-operation("/me/plan", "put", "整体保存志愿顺序并校验版本", ref("Plan"), {
-  input: ref("Plan"),
+operation(
+  "/recommendations/{run_id}/events",
+  "get",
+  "编号恢复的本人任务SSE",
+  ref("RunEvent"),
+  { headers: ["Last-Event-ID"] },
+);
+paths["/recommendations/{run_id}/events"].get.responses[200] = {
   description:
-    "version为客户端读到的版本；原子 compare-and-swap，冲突409；entries数组顺序即志愿顺序。服务端校验专业归属、重复院校专业、当前省份志愿个数。",
+    "id等于event_id；result.payload.validated必须为true；断开不等于取消",
+  content: { "text/event-stream": { schema: str() } },
+  "x-event-schema": ref("RunEvent"),
+};
+operation(
+  "/recommendations/{run_id}/answers",
+  "post",
+  "补问生成新画像版本并继续任务",
+  ref("RunAccepted"),
+  { body: ref("RunAnswers"), code: 202, key: true },
+);
+operation(
+  "/recommendations/{run_id}/cancel",
+  "post",
+  "显式取消任务",
+  ref("RunAccepted"),
+  { body: ref("RunCancel"), code: 202, key: true },
+);
+operation(
+  "/feedback",
+  "post",
+  "绑定任务和推荐项的偏好或事实纠错反馈",
+  ref("Accepted"),
+  { body: ref("RecommendationFeedback"), code: 201, key: true },
+);
+operation("/me/plan", "put", "按版本保存招生单位草案", ref("Plan"), {
+  body: ref("Plan"),
 });
 operation(
   "/plans/simulations",
   "post",
-  "检查指定版本的志愿方案",
+  "逐项条件检查；未知不等于通过",
   ref("Simulation"),
-  {
-    input: obj({ planId: str(), version: int({ minimum: 1 }) }),
-    description:
-      "必须核验方案所有权与版本，过期409。v0.1为条件及结构检查，不提供录取概率。",
-  },
+  { body: input({ plan_id: id, version: int() }) },
 );
-operation("/posts", "post", "提交匿名来信进入审核", ref("Post"), {
-  input: ref("PostInput"),
-  description:
-    "初始状态pending。由服务端完成清洗、隐私与广告识别、可信度计算，客户端不能提交signal、trust、author或status。",
+operation("/posts", "get", "仅返回所选学校的公开分页来信", ref("PostPage"), {
+  publicAccess: true,
+  query: ["school_id", "topic", "query", "strong_only", "cursor"],
+});
+operation("/posts", "post", "原创投稿待审，与注册申请独立", ref("Post"), {
+  body: ref("PostInput"),
+  code: 201,
+  key: true,
+});
+operation("/posts/{post_id}", "get", "按对象权限读取来信", ref("Post"), {
+  publicAccess: true,
+});
+operation("/posts/{post_id}", "patch", "编辑产生版本并重新审核", ref("Post"), {
+  body: ref("PostPatch"),
 });
 operation(
-  "/posts/{postId}/feedback",
-  "post",
-  "提交帮助投票、不同体验或可信度申诉",
-  obj({ accepted: bool }),
-  {
-    input: ref("FeedbackInput"),
-    description:
-      "helpful/disagree需认证用户且每用户每帖每类幂等；appeal需登录且reason至少10字。生成申诉/反馈记录，供人工复核。",
-  },
+  "/posts/{post_id}",
+  "delete",
+  "删除并失效相关检索资格",
+  { type: "null" },
+  { body: ref("ExpectedVersion") },
 );
 operation(
-  "/verifications",
+  "/posts/{post_id}/feedback",
   "post",
-  "上传脱敏后的身份凭证",
+  "帖子投票或评分申诉",
+  ref("Accepted"),
+  { body: ref("PostFeedback") },
+);
+operation(
+  "/evidence/{evidence_id}",
+  "get",
+  "证据状态、原文定位、版本与范围",
+  ref("Source"),
+  { publicAccess: true },
+);
+operation(
+  "/me/student-verification",
+  "post",
+  "正式账号的学校认证申请",
   ref("Verification"),
   {
-    input: obj({ schoolId: str(), document: str({ format: "binary" }) }),
+    body: input({ school_id: id, document: str({ format: "binary" }) }),
     form: true,
-    description:
-      "仅JPG/PNG/PDF，5MiB以内，服务端校验真实magic bytes、病毒与解压炸弹，私有加密存储，禁止公开URL。",
+    code: 202,
   },
 );
-operation("/admin/reviews", "get", "获取审核员可见待审队列", arr(ref("Post")), {
-  description:
-    "要求reviewer或admin，普通用户403。包含待审帖子、可信度分项和可见证据；不授予注册审批权限。",
+operation(
+  "/admin/student-verifications",
+  "get",
+  "独立学校认证审核队列",
+  ref("VerificationPage"),
+  { query: ["cursor"] },
+);
+operation(
+  "/admin/student-verifications/{verification_id}/document",
+  "get",
+  "受保护的学校证明原件",
+  str({ format: "binary" }),
+);
+paths[
+  "/admin/student-verifications/{verification_id}/document"
+].get.responses[200] = {
+  description: "受对象权限保护的原件",
+  content: {
+    "application/octet-stream": { schema: str({ format: "binary" }) },
+  },
+};
+operation(
+  "/admin/student-verifications/{verification_id}/decision",
+  "post",
+  "确认学校范围或驳回材料",
+  ref("Verification"),
+  {
+    body: input({
+      decision: en(["approve", "reject"]),
+      reason: str(),
+      scope: str(),
+      expected_version: int({ minimum: 1 }),
+    }),
+  },
+);
+operation(
+  "/admin/reviews",
+  "get",
+  "仅内容审核权限的分页队列",
+  ref("PostPage"),
+  { query: ["cursor"] },
+);
+operation(
+  "/admin/reviews/{post_id}",
+  "post",
+  "带期望版本的内容审核",
+  ref("Post"),
+  { body: ref("Decision") },
+);
+operation("/me/history", "get", "本人推荐历史", arr(ref("History")));
+operation("/me/memories", "get", "本人可确认的偏好记忆", arr(ref("Memory")));
+operation(
+  "/me/memories/{memory_id}",
+  "patch",
+  "确认或修改记忆版本",
+  ref("Memory"),
+  { body: ref("MemoryPatch") },
+);
+operation("/me/memories/{memory_id}", "delete", "删除个人记忆", {
+  type: "null",
 });
 operation(
-  "/admin/reviews/{postId}",
+  "/me/case-sharing-consent",
+  "get",
+  "独立的跨用户案例共享授权",
+  ref("Sharing"),
+);
+operation(
+  "/me/case-sharing-consent",
   "post",
-  "记录人工决定并转换状态",
-  ref("Post"),
+  "授权去标识化案例共享",
+  ref("Sharing"),
+  { body: input({ consent: { type: "boolean", const: true } }) },
+);
+operation(
+  "/me/case-sharing-consent",
+  "delete",
+  "立即撤回共享并启动派生缓存清理",
+  { type: "null" },
+);
+operation(
+  "/chat/stream",
+  "post",
+  "普通问答；不替代已校验推荐任务",
+  ref("ChatEvent"),
   {
-    input: ref("ReviewInput"),
-    description:
-      "reviewer或admin可用；pending→published或rejected，已处理返回409；写入不可变审计记录。",
+    body: input(
+      {
+        message: str({ minLength: 1, maxLength: 4000 }),
+        conversation_id: str(),
+      },
+      ["message"],
+    ),
   },
 );
-operation("/chat/stream", "post", "POST SSE流式Agent对话", ref("ChatEvent"), {
-  input: ref("ChatRequest"),
-  description:
-    "详见接口说明SSE章节。每条data为完整JSON ChatEvent，必须以done结束；错误使用error。禁止返回模型隐藏思维链，只提供工具公开执行状态。引用的学校、帖子与证据必须在bootstrap中可解析。",
-});
 paths["/chat/stream"].post.responses[200] = {
-  description:
-    "text/event-stream; charset=utf-8，UTF-8 SSE，不包data/requestId响应信封",
-  content: {
-    "text/event-stream": {
-      schema: str(),
-      example:
-        'event: delta\ndata: {"type":"delta","text":"可以先了解…"}\n\nevent: done\ndata: {"type":"done","conversationId":"conv-01"}\n\n',
-    },
-  },
+  description: "普通问答UTF8 SSE；字段使用snake_case，不套成功信封",
+  content: { "text/event-stream": { schema: str() } },
   "x-event-schema": ref("ChatEvent"),
 };
 const contract = {
   openapi: "3.1.0",
   info: {
-    title: "夜航 Night Voyage · 前后端对接契约",
-    version: "0.1.0",
+    title: "夜航 · 技术方案对齐的前端联调契约",
+    version: "0.4.0",
     description:
-      "现有前端17项兼容接口，与src/api.ts同步。M0–M1真实后端扩展与限制见共享docs/contracts/BACKEND.md，完整路由见backend-openapi.json。",
+      "根据技术方案第4–9、12–13章迁移。此为可运行前端与Mock使用的联调提案，真实后端仍需共同验收。DTO使用snake_case，React内部显式映射；会话、注册查询凭据和学校认证分离。",
   },
-  servers: [
-    { url: "http://127.0.0.1:8000/api/v1", description: "FastAPI本地联调" },
-  ],
+  servers: [{ url: "http://127.0.0.1:8000/api/v1" }],
   paths,
   components: {
+    schemas,
     securitySchemes: {
       session: {
         type: "apiKey",
         in: "cookie",
         name: "nv_session",
-        description: "HttpOnly; Secure(生产); SameSite=Lax；服务端存会话和角色",
+        description: "HttpOnly; Secure; SameSite，服务端执行CSRF和对象权限",
       },
     },
-    schemas,
   },
 };
-const outputs = [
-  new URL("../docs/openapi.json", import.meta.url),
-  new URL("../../../docs/contracts/openapi.json", import.meta.url),
-];
-const serialized = JSON.stringify(contract, null, 2) + "\n";
-const check = process.argv.includes("--check");
-for (const output of outputs) {
-  if (check) {
-    let actual;
-    try {
-      actual = readFileSync(output, "utf8");
-    } catch {
-      throw new Error(
-        `Missing contract: ${output.pathname}; run pnpm run contract`,
-      );
-    }
-    if (actual.replace(/\r\n/g, "\n") !== serialized)
-      throw new Error(
-        `Stale contract: ${output.pathname}; run pnpm run contract`,
-      );
-  } else {
-    mkdirSync(new URL(".", output), { recursive: true });
-    writeFileSync(output, serialized);
+const text = JSON.stringify(contract, null, 2) + "\n";
+const root = new URL("../../../", import.meta.url);
+const outputs = [new URL("../docs/openapi.json", import.meta.url)];
+if (existsSync(new URL(".git", root)))
+  outputs.push(new URL("docs/contracts/openapi.json", root));
+if (process.argv.includes("--check")) {
+  const stale = outputs.filter(
+    (path) =>
+      !existsSync(path) ||
+      readFileSync(path, "utf8").replace(/\r\n/g, "\n") !== text,
+  );
+  if (stale.length) {
+    console.error(
+      "OpenAPI产物已过期，请执行 pnpm run contract：",
+      stale.map((path) => path.pathname).join(", "),
+    );
+    process.exit(1);
+  }
+} else {
+  for (const path of outputs) {
+    mkdirSync(new URL("./", path), { recursive: true });
+    writeFileSync(path, text);
   }
 }
 console.log(
-  `OpenAPI ${check ? "verified" : "generated"} in both locations: ${Object.values(paths).reduce((n, p) => n + Object.keys(p).length, 0)} operations, ${Object.keys(schemas).length} schemas`,
+  `OpenAPI v0.4 ${process.argv.includes("--check") ? "checked" : "generated"}: ${Object.values(paths).reduce((n, p) => n + Object.keys(p).length, 0)} operations, ${Object.keys(schemas).length} schemas`,
 );

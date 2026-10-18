@@ -25,7 +25,7 @@ test("账号决定登录权限，错误密码和昵称不能登录，认证身�
   assert.equal(canReview(contributor), false);
   assert.equal(contributor.verified, true);
   assert.equal(loginDestination(reviewer), "/admin");
-  assert.equal(loginDestination(admin), "/admin");
+  assert.equal(loginDestination(admin), "/admin/registrations");
   assert.equal(admin.verified, false);
   assert.equal(canReview(null), false);
   assert.equal(authenticateDemo(loginInput("领航员", password)), null);

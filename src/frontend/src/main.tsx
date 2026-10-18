@@ -1,3 +1,4 @@
+import { hasPermission } from "./types";
 import { StrictMode, lazy, Suspense, useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -17,12 +18,12 @@ import {
 } from "lucide-react";
 import { Provider, useApp } from "./store";
 import { isMock } from "./api";
-import { canReview } from "./auth";
 import { Home } from "./pages/Explore";
 import { Explore } from "./pages/Atlas";
 import "./styles.css";
 import "./voyage.css";
 import "./campus.css";
+import "./workflow.css";
 const Content = lazy(() => import("./pages/Content"));
 const Planning = lazy(() => import("./pages/Planning"));
 const Account = lazy(() => import("./pages/Account"));
@@ -114,6 +115,11 @@ function App() {
       "/admin": "审核工作台",
       "/me": "我的夜航",
       "/login": "登录夜航",
+      "/register": "注册申请",
+      "/application": "申请状态",
+      "/admin/registrations": "注册审核",
+      "/history": "历史与偏好授权",
+      "/admin/verifications": "学校认证审核",
     }[path] ||
     (path.startsWith("/echoes/")
       ? "回声广场"
@@ -225,10 +231,16 @@ function App() {
             <span>灯塔计划</span>
             <ArrowUpRight size={14} />
           </button>
-          {canReview(data.user) && (
+          {hasPermission(data.user, "content:review") && (
             <button onClick={() => navigate("/admin")}>
               <ShieldCheck size={18} />
               <span>内容审核</span>
+            </button>
+          )}
+          {hasPermission(data.user, "registration:review") && (
+            <button onClick={() => navigate("/admin/registrations")}>
+              <UserRound size={18} />
+              <span>注册申请审核</span>
             </button>
           )}
           <div className="sidebar-note">

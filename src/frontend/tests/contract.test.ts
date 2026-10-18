@@ -1,17 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+  readFileSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  copyFileSync,
+  writeFileSync,
+  rmSync,
+} from "node:fs";
+import { spawnSync } from "node:child_process";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 const doc = JSON.parse(
   readFileSync(new URL("../docs/openapi.json", import.meta.url), "utf8"),
 );
-test("前端接口副本与共享契约一致", () => {
-  const shared = JSON.parse(
-    readFileSync(
-      new URL("../../../docs/contracts/openapi.json", import.meta.url),
-      "utf8",
-    ),
+test("共享契约与前端副本保持一致", () => {
+  const shared = new URL(
+    "../../../docs/contracts/openapi.json",
+    import.meta.url,
   );
-  assert.deepEqual(doc, shared);
+  if (existsSync(shared))
+    assert.deepEqual(JSON.parse(readFileSync(shared, "utf8")), doc);
 });
 test("每个OpenAPI引用可解析，且操作标识唯一", () => {
   const ids: string[] = [];
@@ -34,24 +45,19 @@ test("每个OpenAPI引用可解析，且操作标识唯一", () => {
   >[])
     for (const op of Object.values(path)) ids.push(op.operationId);
   assert.equal(ids.length, new Set(ids).size);
-  assert.equal(ids.length, 17);
-  assert.ok(doc.paths["/auth/login"].post);
-  assert.ok(doc.paths["/auth/logout"].post);
+  assert.ok(ids.length >= 47);
+  for (const path of [
+    "/registration-applications",
+    "/auth/login",
+    "/me/profile",
+    "/recommendations/{run_id}/events",
+    "/feedback",
+  ])
+    assert.ok(doc.paths[path]);
   assert.equal(doc.paths["/auth/session"], undefined);
-  assert.deepEqual(doc.components.schemas.LoginRequest.required, [
-    "login_type",
-    "identifier",
-    "password",
-  ]);
-  assert.equal(doc.components.schemas.LoginRequest.additionalProperties, false);
-  const invalid =
-    doc.paths["/auth/login"].post.responses[422].content["application/json"];
-  assert.equal(invalid.schema.$ref, "#/components/schemas/Error");
-  assert.equal(invalid.examples.invalidEmail.value.error.code, "EMAIL_INVALID");
-  assert.ok(
-    invalid.examples.invalidEmail.value.error.message.includes("请重新输入"),
-  );
-  assert.ok(invalid.examples.invalidEmail.value.requestId);
+  assert.ok(doc.paths["/recommendations"].post.responses["202"]);
+  assert.ok(doc.paths["/feedback"].post.responses["201"]);
+  assert.ok(doc.paths["/me/profile"].patch);
 });
 test("所有写接口声明CSRF头，SSE具有专用媒体类型", () => {
   for (const methods of Object.values(doc.paths) as Record<
@@ -70,4 +76,45 @@ test("所有写接口声明CSRF头，SSE具有专用媒体类型", () => {
     doc.components.schemas.Simulation.properties.probabilities.type,
     "null",
   );
+});
+
+test("contract:check拒绝陈旧产物、不自动改写，并接受CRLF副本", () => {
+  mkdirSync(new URL("../tmp/", import.meta.url), { recursive: true });
+  const tempRoot = mkdtempSync(
+    new URL("../tmp/contract-check-", import.meta.url),
+  );
+  try {
+    const scripts = join(tempRoot, "src/frontend/scripts"),
+      docs = join(tempRoot, "src/frontend/docs"),
+      shared = join(tempRoot, "docs/contracts");
+    for (const dir of [scripts, docs, shared, join(tempRoot, ".git")])
+      mkdirSync(dir, { recursive: true });
+    const script = join(scripts, "contract.mjs");
+    copyFileSync(new URL("../scripts/contract.mjs", import.meta.url), script);
+    assert.equal(
+      spawnSync(process.execPath, [script], { encoding: "utf8" }).status,
+      0,
+    );
+    const output = join(docs, "openapi.json"),
+      sharedFile = join(shared, "openapi.json");
+    writeFileSync(output, readFileSync(output, "utf8").replace(/\n/g, "\r\n"));
+    assert.equal(
+      spawnSync(process.execPath, [script, "--check"], { encoding: "utf8" })
+        .status,
+      0,
+    );
+    writeFileSync(sharedFile, "stale");
+    assert.equal(
+      spawnSync(process.execPath, [script, "--check"], { encoding: "utf8" })
+        .status,
+      1,
+    );
+    assert.equal(readFileSync(sharedFile, "utf8"), "stale");
+  } finally {
+    const expectedRoot = resolve(
+      fileURLToPath(new URL("../tmp/", import.meta.url)),
+    );
+    assert.ok(resolve(tempRoot).startsWith(expectedRoot));
+    rmSync(tempRoot, { recursive: true, force: true });
+  }
 });

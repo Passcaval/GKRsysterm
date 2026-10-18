@@ -12,6 +12,8 @@ import { useApp } from "../store";
 import { StarMap } from "./Explore";
 import { SchoolCard, Empty } from "../components";
 import type { School } from "../types";
+import { api, isMock } from "../api";
+import { errorText } from "../transport";
 
 export function Explore() {
   const { data, navigate } = useApp();
@@ -40,12 +42,53 @@ export function Explore() {
     setFilters(false);
     setSailingTo(school);
   }
-  const schools = data.schools.filter(
-    (s) =>
-      (s.name + s.city + s.majors.join("")).includes(query) &&
-      (city === "全部城市" || s.city === city) &&
-      (major === "全部专业" || s.majors.includes(major)),
-  );
+  const [remoteSchools, setRemoteSchools] = useState<School[]>([]),
+    [cursor, setCursor] = useState<string | null>(null),
+    [loading, setLoading] = useState(false),
+    [error, setError] = useState("");
+  useEffect(() => {
+    if (isMock) return;
+    let active = true;
+    setRemoteSchools([]);
+    setCursor(null);
+    setLoading(true);
+    setError("");
+    const timer = setTimeout(
+      () =>
+        api
+          .schools(
+            query,
+            null,
+            city === "全部城市" ? "" : city,
+            major === "全部专业" ? "" : major,
+          )
+          .then((page) => {
+            if (active) {
+              setRemoteSchools(page.items);
+              setCursor(page.nextCursor);
+            }
+          })
+          .catch((e) => {
+            if (active) setError(errorText(e));
+          })
+          .finally(() => {
+            if (active) setLoading(false);
+          }),
+      200,
+    );
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query, city, major]);
+  const schools = isMock
+    ? data.schools.filter(
+        (s) =>
+          (s.name + s.city + s.majors.join("")).includes(query) &&
+          (city === "全部城市" || s.city === city) &&
+          (major === "全部专业" || s.majors.includes(major)),
+      )
+    : remoteSchools;
   useEffect(() => {
     setSelected(null);
   }, [query, city, major, view]);
@@ -176,13 +219,50 @@ export function Explore() {
           </div>
         </div>
       )}
-      {!schools.length && (
+      {!schools.length && !loading && !error && (
         <div className="atlas-empty">
           <Empty
             text="没有符合条件的院校，试着放宽筛选。"
             action="重置筛选"
             onAction={reset}
           />
+        </div>
+      )}
+      {(loading || error || cursor) && (
+        <div className="atlas-load-more" role="status">
+          {loading ? (
+            <span>正在读取院校…</span>
+          ) : error ? (
+            <span>{error}</span>
+          ) : (
+            <button
+              className="button"
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const page = await api.schools(
+                    query,
+                    cursor,
+                    city === "全部城市" ? "" : city,
+                    major === "全部专业" ? "" : major,
+                  );
+                  setRemoteSchools((rows) => [
+                    ...rows,
+                    ...page.items.filter(
+                      (s) => !rows.some((r) => r.id === s.id),
+                    ),
+                  ]);
+                  setCursor(page.nextCursor);
+                } catch (e) {
+                  setError(errorText(e));
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              加载更多院校（当前{schools.length}所）
+            </button>
+          )}
         </div>
       )}
       {selected && view === "map" && !sailingTo && (
@@ -230,7 +310,8 @@ export function Explore() {
         </div>
       )}
       <span className="atlas-disclaimer">
-        示例位次与布局 · 推荐仅供参考，以当年官方发布为准
+        {isMock ? "示例位次与布局" : "当前仅显示已加载院校；布局不代表录取风险"}{" "}
+        · 以当年官方发布为准
       </span>
     </section>
   );

@@ -1,3 +1,4 @@
+import { hasPermission } from "./types.ts";
 import type { User } from "./types.ts";
 
 export interface LoginInput {
@@ -17,9 +18,13 @@ export function loginInput(identifier: string, password: string): LoginInput {
 }
 
 export function canReview(user: User | null): boolean {
-  return user?.role === "admin" || user?.role === "reviewer";
+  return hasPermission(user, "content:review");
 }
 
 export function loginDestination(user: User): string {
-  return canReview(user) ? "/admin" : "/me";
+  return hasPermission(user, "registration:review")
+    ? "/admin/registrations"
+    : canReview(user)
+      ? "/admin"
+      : "/me";
 }

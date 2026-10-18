@@ -1,3 +1,4 @@
+import { AdmissionUnits } from "../AdmissionUnits";
 import { useState, useEffect } from "react";
 import {
   ArrowLeft,
@@ -13,7 +14,8 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useApp } from "../store";
-import { api } from "../api";
+import { api, isMock } from "../api";
+import { errorText } from "../transport";
 import {
   SignalBadge,
   Modal,
@@ -22,7 +24,7 @@ import {
   Empty,
   SectionTitle,
 } from "../components";
-import type { Post, School } from "../types";
+import { hasPermission, type Post, type School } from "../types";
 import { campusPosts } from "../campus";
 import { CampusSky } from "../CampusSky";
 function Echoes({ school }: { school: School }) {
@@ -30,14 +32,50 @@ function Echoes({ school }: { school: School }) {
   const [topic, setTopic] = useState("全部回声");
   const [strong, setStrong] = useState(false);
   const [query, setQuery] = useState("");
+  const [remotePosts, setRemotePosts] = useState<Post[]>([]),
+    [cursor, setCursor] = useState<string | null>(null),
+    [loading, setLoading] = useState(false),
+    [loadError, setLoadError] = useState("");
+  useEffect(() => {
+    if (isMock) return;
+    let active = true;
+    setRemotePosts([]);
+    setCursor(null);
+    setLoading(true);
+    setLoadError("");
+    const timer = setTimeout(
+      () =>
+        api
+          .posts(school.id, topic, query, strong)
+          .then((page) => {
+            if (active) {
+              setRemotePosts(page.items);
+              setCursor(page.nextCursor);
+            }
+          })
+          .catch((e) => {
+            if (active) setLoadError(errorText(e));
+          })
+          .finally(() => {
+            if (active) setLoading(false);
+          }),
+      200,
+    );
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [school.id, topic, query, strong]);
   const allPosts = campusPosts(data.posts, school.id);
-  const posts = campusPosts(data.posts, school.id, topic, strong, query);
+  const posts = isMock
+    ? campusPosts(data.posts, school.id, topic, strong, query)
+    : remotePosts;
   useEffect(() => {
     localStorage.setItem("nv-echo-school", school.id);
   }, [school.id]);
   return (
     <div className="campus-board">
-      <CampusSky school={school} count={allPosts.length} />
+      <CampusSky school={school} count={isMock ? allPosts.length : null} />
       <div className="campus-board-layout">
         <section
           className="campus-letters"
@@ -87,7 +125,8 @@ function Echoes({ school }: { school: School }) {
               onChange={(e) => setQuery(e.target.value)}
             />
             <span className="muted">
-              {posts.length} / {allPosts.length} 封来信
+              {posts.length} 封已加载{" "}
+              {isMock ? `/共${allPosts.length}封` : " · 按服务端分页读取"}
             </span>
           </div>
           <div className="letter-grid echo-wall">
@@ -98,9 +137,7 @@ function Echoes({ school }: { school: School }) {
                 onClick={() => navigate("/post/" + p.id)}
               >
                 <div className="letter-top">
-                  <span>
-                    {data.schools.find((s) => s.id === p.schoolId)?.name}
-                  </span>
+                  <span>{school.name}</span>
                   <span className="postmark">
                     来自校园
                     <br />
@@ -124,7 +161,44 @@ function Echoes({ school }: { school: School }) {
               </button>
             ))}
           </div>
-          {!posts.length && (
+          {loading && <p role="status">正在读取本校来信…</p>}
+          {loadError && (
+            <div className="notice amber" role="alert">
+              <p>{loadError}</p>
+            </div>
+          )}
+          {cursor && (
+            <button
+              className="button"
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                try {
+                  const page = await api.posts(
+                    school.id,
+                    topic,
+                    query,
+                    strong,
+                    cursor,
+                  );
+                  setRemotePosts((p) => [
+                    ...p,
+                    ...page.items.filter(
+                      (next) => !p.some((old) => old.id === next.id),
+                    ),
+                  ]);
+                  setCursor(page.nextCursor);
+                } catch (e) {
+                  setLoadError(errorText(e));
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              加载更多本校来信
+            </button>
+          )}
+          {!posts.length && !loading && !loadError && (
             <Empty
               text={
                 allPosts.length
@@ -176,7 +250,7 @@ function Echoes({ school }: { school: School }) {
               </div>
               <div>
                 <dt>校园来信</dt>
-                <dd>{allPosts.length} 封</dd>
+                <dd>{isMock ? `${allPosts.length} 封` : "按需加载"}</dd>
               </div>
             </dl>
             <h3>在这里探索</h3>
@@ -243,8 +317,8 @@ function TrustPanel({ post }: { post: Post }) {
           <div>
             <span>{name}</span>
             <b>
-              {values[i] === null ? "待评估" : values[i]}
-              {values[i] !== null && <small>/100</small>}
+              {values[i] ?? "未评估"}
+              <small>/100</small>
             </b>
           </div>
           <div className="meter">
@@ -305,9 +379,12 @@ function TrustPanel({ post }: { post: Post }) {
   );
 }
 function PostDetail({ post }: { post: Post }) {
-  const { data, navigate, notify } = useApp();
+  const { data, navigate, notify, refresh } = useApp();
   const [evidence, setEvidence] = useState(false);
   const [folded, setFolded] = useState(post.signal === "disputed");
+  const [editing, setEditing] = useState(false),
+    [draft, setDraft] = useState({ title: post.title, body: post.body }),
+    [editError, setEditError] = useState("");
   return (
     <>
       <button
@@ -359,6 +436,101 @@ function PostDetail({ post }: { post: Post }) {
           <div className="paper-note">
             一段经历只能照亮一部分校园。多听几种声音，再做自己的判断。
           </div>
+          <section className="claim-list">
+            <h2>具体说法与证据</h2>
+            {post.claims?.length ? (
+              post.claims.map((claim) => (
+                <div key={claim.id}>
+                  <h3>{claim.text}</h3>
+                  <p>
+                    核验：{claim.supportStatus} · 时效：{claim.freshness} ·
+                    版本：{claim.sourceVersion || "待确认"}
+                  </p>
+                  <p>{claim.scope || "适用范围待确认"}</p>
+                  {claim.relations.map((r) => (
+                    <p key={r.evidenceId}>
+                      {r.relation === "supports"
+                        ? "支持"
+                        : r.relation === "refutes"
+                          ? "反驳"
+                          : "背景"}{" "}
+                      · {r.evidenceId}
+                    </p>
+                  ))}
+                  <Evidence ids={claim.relations.map((r) => r.evidenceId)} />
+                </div>
+              ))
+            ) : (
+              <p className="muted">
+                尚未返回逐条说法的核验记录，整帖评分不能替代具体结论的证据。
+              </p>
+            )}
+          </section>
+          {post.isMine && (
+            <section>
+              <button
+                className="text-button"
+                onClick={() => setEditing(!editing)}
+              >
+                编辑我的来信
+              </button>
+              {editing && (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      await api.editPost(post.id, draft, post.version || 1);
+                      await refresh();
+                      setEditing(false);
+                      notify("修改已提交，等待重新审核");
+                    } catch (e) {
+                      setEditError(errorText(e));
+                    }
+                  }}
+                >
+                  <label>
+                    标题
+                    <input
+                      required
+                      minLength={5}
+                      value={draft.title}
+                      onChange={(e) =>
+                        setDraft((d) => ({ ...d, title: e.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    正文
+                    <textarea
+                      required
+                      minLength={80}
+                      value={draft.body}
+                      onChange={(e) =>
+                        setDraft((d) => ({ ...d, body: e.target.value }))
+                      }
+                    />
+                  </label>
+                  {editError && <p role="alert">{editError}</p>}
+                  <button className="button">保存新版本并重新审核</button>
+                  <button
+                    type="button"
+                    className="text-button danger"
+                    onClick={async () => {
+                      try {
+                        await api.deletePost(post.id, post.version || 1);
+                        await refresh();
+                        navigate("/me");
+                      } catch (e) {
+                        setEditError(errorText(e));
+                      }
+                    }}
+                  >
+                    删除这封来信
+                  </button>
+                </form>
+              )}
+            </section>
+          )}
           <div className="post-actions">
             <button
               onClick={async () => {
@@ -461,7 +633,9 @@ function SchoolDetail({ school: s }: { school: School }) {
               </button>
             ))}
           </div>
-          {tab === "官方数据" ? (
+          {tab === "官方数据" && !isMock ? (
+            <AdmissionUnits school={s} />
+          ) : tab === "官方数据" ? (
             <>
               <section className="panel">
                 <SectionTitle title="历年录取参考">
@@ -562,7 +736,7 @@ function SchoolDetail({ school: s }: { school: School }) {
                     <h3>{m}</h3>
                     <p>
                       示例选科要求：{s.requiredSubjects.join(" + ")} · 学费{" "}
-                      {s.tuition} 元/年
+                      {s.tuition ?? "待确认"} 元/年
                     </p>
                   </div>
                   <button
@@ -648,39 +822,69 @@ function SchoolDetail({ school: s }: { school: School }) {
 }
 export default function Content({ path }: { path: string }) {
   const { data, navigate } = useApp();
-  if (path === "/echoes" || path.startsWith("/echoes/")) {
-    const requested = path.split("/")[2];
-    const remembered = localStorage.getItem("nv-echo-school");
-    const school = requested
-      ? data.schools.find((s) => encodeURIComponent(s.id) === requested)
-      : data.schools.find((s) => s.id === remembered) ||
-        data.schools.find((s) => campusPosts(data.posts, s.id).length) ||
-        data.schools[0];
-    return school ? (
-      <Echoes key={school.id} school={school} />
-    ) : (
+  const isPost = path.startsWith("/post/");
+  const specified = path.split("/")[2];
+  const fallback =
+    data.schools.find((s) => s.id === localStorage.getItem("nv-echo-school")) ||
+    data.schools.find((s) => campusPosts(data.posts, s.id).length) ||
+    data.schools[0];
+  let id = "";
+  try {
+    id = specified ? decodeURIComponent(specified) : fallback?.id || "";
+  } catch {}
+  const [resource, setResource] = useState<{
+      path: string;
+      school?: School;
+      post?: Post;
+    } | null>(null),
+    [failure, setFailure] = useState("");
+  useEffect(() => {
+    let active = true;
+    setResource(null);
+    setFailure("");
+    if (!id) {
+      setFailure("请先在院校星图选择一所学校");
+      return;
+    }
+    const task = isPost ? api.post(id) : api.school(id);
+    task
+      .then((value) => {
+        if (active)
+          setResource(
+            isPost
+              ? { path, post: value as Post }
+              : { path, school: value as School },
+          );
+      })
+      .catch((e) => {
+        if (active) setFailure(errorText(e));
+      });
+    return () => {
+      active = false;
+    };
+  }, [path, id, data.user?.id, data.posts, data.schools]);
+  if (failure)
+    return (
       <Empty
-        text="该院校不存在或已下线。"
+        text={failure}
         action="返回院校星图"
         onAction={() => navigate("/explore")}
       />
     );
-  }
-  if (path.startsWith("/school/")) {
-    const s = data.schools.find((s) => s.id === path.split("/")[2]);
-    return s ? (
-      <SchoolDetail school={s} />
-    ) : (
-      <Empty text="院校不存在或已下线。" />
+  if (!resource || resource.path !== path)
+    return (
+      <p className="empty" role="status">
+        正在按标识读取详情…
+      </p>
     );
-  }
-  const p = data.posts.find((p) => p.id === path.split("/")[2]);
-  const canSee =
-    p &&
-    (p.status === "published" || data.user?.role === "reviewer" || p.isMine);
-  return canSee ? (
-    <PostDetail post={p} />
-  ) : (
-    <Empty text="来信不存在，或尚未公开。" />
-  );
+  if (isPost)
+    return (
+      <PostDetail
+        key={resource.post!.id + ":" + resource.post!.version}
+        post={resource.post!}
+      />
+    );
+  if (path.startsWith("/school/"))
+    return <SchoolDetail key={resource.school!.id} school={resource.school!} />;
+  return <Echoes key={resource.school!.id} school={resource.school!} />;
 }

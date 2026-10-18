@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useApp } from "./store";
 import { api, isMock } from "./api";
+import { errorText, beijingTime } from "./transport";
 import { classify, tierLabel, tierSymbol } from "./domain";
 import type { School, Signal, Tier } from "./types";
 export const signalLabels: Record<Signal, string> = {
@@ -115,13 +116,41 @@ export function Modal({
 }
 export function Evidence({ ids }: { ids: string[] }) {
   const { data } = useApp();
+  const [sources, setSources] = useState(
+    data.sources.filter((s) => ids.includes(s.id)),
+  );
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let active = true;
+    setErrors({});
+    setSources(data.sources.filter((s) => ids.includes(s.id)));
+    for (const id of ids)
+      api
+        .source(id)
+        .then((source) => {
+          if (active)
+            setSources((current) => [
+              ...current.filter((s) => s.id !== id),
+              source,
+            ]);
+        })
+        .catch((e) => {
+          if (active) {
+            setSources((current) => current.filter((s) => s.id !== id));
+            setErrors((current) => ({ ...current, [id]: errorText(e) }));
+          }
+        });
+    return () => {
+      active = false;
+    };
+  }, [ids.join("|")]);
   return (
     <div className="evidence-list">
       {ids.length === 0 ? (
         <p className="muted">暂无可引用证据。</p>
       ) : (
         ids.map((id) => {
-          const s = data.sources.find((s) => s.id === id);
+          const s = sources.find((s) => s.id === id);
           return s ? (
             <article className={`evidence ${s.kind}`} key={id}>
               <span className="eyebrow">
@@ -134,9 +163,28 @@ export function Evidence({ ids }: { ids: string[] }) {
               </span>
               <h4>{s.title}</h4>
               <p>{s.excerpt}</p>
-              <small>
-                检索时间 {new Date(s.retrievedAt).toLocaleDateString("zh-CN")}
-              </small>
+              <small>检索时间 {beijingTime(s.retrievedAt)}（北京时间）</small>
+              <p className="muted">
+                来源版本 {s.version || "待确认"} · 定位 {s.locator || "未提供"}
+              </p>
+              <p className="warning-text">
+                支持状态：
+                {
+                  {
+                    supported: "有支持证据",
+                    refuted: "存在反驳",
+                    unverified: "尚未核验",
+                    withdrawn: "已撤回",
+                  }[s.supportStatus || "unverified"]
+                }{" "}
+                · 时效：
+                {
+                  { current: "当前", expired: "已过期", unknown: "待确认" }[
+                    s.freshness || "unknown"
+                  ]
+                }
+              </p>
+              <p className="muted">{s.scope || "适用范围待确认"}</p>
               {s.url && /^https?:\/\//.test(s.url) ? (
                 <a href={s.url} target="_blank" rel="noreferrer">
                   查看原文 <ExternalLink size={12} />
@@ -147,7 +195,7 @@ export function Evidence({ ids }: { ids: string[] }) {
             </article>
           ) : (
             <p key={id} className="warning-text">
-              来源 {id} 暂未加载，请刷新后重试。
+              来源 {id}：{errors[id] || "正在按ID加载…"}
             </p>
           );
         })
@@ -170,9 +218,15 @@ export function SchoolCard({
   const inPlan = data.plan.entries.some((e) => e.schoolId === school.id);
   const tier =
     providedTier ||
-    (isMock ? classify(data.profile?.rank || 23500, school.rank) : "unknown");
+    (isMock
+      ? classify(data.profile?.rank ?? null, school.rank)
+      : school.historicalRisk || "unknown");
   async function add() {
     if (saving) return;
+    if (!isMock) {
+      navigate("/school/" + school.id);
+      return;
+    }
     setSaving(true);
     try {
       if (!data.user) throw new Error("请先在“我的”登录");
@@ -238,7 +292,7 @@ export function SchoolCard({
       {!compact && <p className="muted">{school.description}</p>}
       <div className="school-bottom">
         <span>
-          参考位次 <b>{school.rank.toLocaleString()}</b>
+          历史位次 <b>{school.rank?.toLocaleString() ?? "待确认"}</b>
           <small>示例 · 2025</small>
         </span>
         <button
