@@ -19,5 +19,7 @@ pnpm run dev
 - [接口对接规范](docs/contracts/API.md) 与 [OpenAPI 契约](docs/contracts/openapi.json)
 - [架构和已实现范围](src/frontend/docs/FRONTEND.md)、[验证记录](src/frontend/docs/VALIDATION.md)
 - [系统技术方案](docs/技术方案.md)
+- [开发者日志](docs/开发日志.md)：逐次提交的改动、作者、验证和合并记录。
+- [提交与协作约定](CONTRIBUTING.md)：每次提交同步追加日志，保留其他开发者的历史。
 
 当前提交包含前端和模拟数据，真实后端与数据联调尚未完成；最终接口需与系统技术方案和后端实现协商确认。
