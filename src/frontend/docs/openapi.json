@@ -155,11 +155,11 @@
         }
       }
     },
-    "/auth/session": {
+    "/auth/login": {
       "post": {
-        "operationId": "post__auth_session",
-        "summary": "登录并设置 HttpOnly 安全会话",
-        "description": "",
+        "operationId": "post__auth_login",
+        "summary": "统一登录：由服务端确定身份并设置 HttpOnly 安全会话",
+        "description": "沿用统一登录请求。login_type仅为标识类型，不是校验结果或用户角色。后端独立校验邮箱或系统ID，格式不合格返回422，error.message须包含原因和重新输入提示；合法格式但认证失败返回统一401，不泄露账号是否存在。",
         "security": [],
         "parameters": [
           {
@@ -278,11 +278,43 @@
             }
           },
           "422": {
-            "description": "字段或省份规则校验失败",
+            "description": "后端校验标识失败；不签发会话。前端沿用现有错误展示，保留输入并允许修改重试。",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "invalidEmail": {
+                    "value": {
+                      "error": {
+                        "code": "EMAIL_INVALID",
+                        "message": "邮箱格式不正确，请重新输入。",
+                        "details": [
+                          {
+                            "field": "identifier",
+                            "message": "请输入符合格式要求的邮箱地址"
+                          }
+                        ]
+                      },
+                      "requestId": "req-email-invalid"
+                    }
+                  },
+                  "invalidIdentifier": {
+                    "value": {
+                      "error": {
+                        "code": "IDENTIFIER_INVALID",
+                        "message": "邮箱或用户 ID 格式不正确，请重新输入。",
+                        "details": [
+                          {
+                            "field": "identifier",
+                            "message": "请输入有效邮箱或系统分配的用户 ID"
+                          }
+                        ]
+                      },
+                      "requestId": "req-identifier-invalid"
+                    }
+                  }
                 }
               }
             }
@@ -318,9 +350,11 @@
             }
           }
         }
-      },
-      "delete": {
-        "operationId": "delete__auth_session",
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "post__auth_logout",
         "summary": "退出并吊销会话",
         "description": "",
         "security": [
@@ -2414,7 +2448,7 @@
       "get": {
         "operationId": "get__admin_reviews",
         "summary": "获取审核员可见待审队列",
-        "description": "要求reviewer，普通用户403。包含待审帖子、可信度分项和可见证据。",
+        "description": "要求reviewer或admin，普通用户403。包含待审帖子、可信度分项和可见证据；不授予注册审批权限。",
         "security": [
           {
             "session": []
@@ -2564,7 +2598,7 @@
       "post": {
         "operationId": "post__admin_reviews__postId_",
         "summary": "记录人工决定并转换状态",
-        "description": "reviewer专用；pending→published或rejected，已处理返回409；写入不可变审计记录。",
+        "description": "reviewer或admin可用；pending→published或rejected，已处理返回409；写入不可变审计记录。",
         "security": [
           {
             "session": []
@@ -2923,7 +2957,8 @@
             "enum": [
               "student",
               "contributor",
-              "reviewer"
+              "reviewer",
+              "admin"
             ]
           },
           "verified": {
@@ -3550,10 +3585,17 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "username": {
+          "login_type": {
+            "type": "string",
+            "enum": [
+              "email",
+              "user_id"
+            ]
+          },
+          "identifier": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 128
+            "maxLength": 254
           },
           "password": {
             "type": "string",
@@ -3562,7 +3604,8 @@
           }
         },
         "required": [
-          "username",
+          "login_type",
+          "identifier",
           "password"
         ]
       },

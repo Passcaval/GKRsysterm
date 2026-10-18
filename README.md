@@ -13,10 +13,10 @@ pnpm install --frozen-lockfile
 pnpm run dev
 ```
 
-默认使用本地演示数据，访问 http://127.0.0.1:5173 。运行 `pnpm run test` 与 `pnpm run build` 完成测试和构建；运行 `pnpm run standalone` 生成可直接打开的单文件演示，生成文件不进入 Git。
+默认使用本地演示数据，访问 http://127.0.0.1:5173 。运行 `pnpm run contract:check`、`pnpm run test` 与 `pnpm run build` 完成测试和构建；构建后运行 `pnpm run standalone` 生成可直接打开的单文件演示，生成文件不进入 Git。
 
 - [前端启动、页面与后端配置](src/frontend/README.md)
-- [接口对接规范](src/frontend/docs/API.md) 与 [OpenAPI 契约](src/frontend/docs/openapi.json)
+- [接口对接规范](docs/contracts/API.md) 与 [OpenAPI 契约](docs/contracts/openapi.json)
 - [架构和已实现范围](src/frontend/docs/FRONTEND.md)、[验证记录](src/frontend/docs/VALIDATION.md)
 - [系统技术方案](docs/技术方案.md)
 

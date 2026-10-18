@@ -3,7 +3,7 @@ export type Signal = "strong" | "medium" | "weak" | "disputed";
 export interface User {
   id: string;
   name: string;
-  role: "student" | "contributor" | "reviewer";
+  role: "student" | "contributor" | "reviewer" | "admin";
   verified: boolean;
 }
 export interface Profile {

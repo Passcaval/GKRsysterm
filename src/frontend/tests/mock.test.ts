@@ -51,7 +51,7 @@ test("演示工作流：权限、投稿待审、人工发布、重复审核冲�
     assert.equal(post.trust.supporting, 0);
     assert.equal(post.trust.identity, 0);
     assert.equal(post.isMine, true);
-    await api.login("审核测试员", "", "reviewer");
+    await api.login("reviewer@example.test", "NightVoyageDemo!");
     assert.ok(
       (await api.moderation()).some((p: { id: string }) => p.id === post.id),
     );

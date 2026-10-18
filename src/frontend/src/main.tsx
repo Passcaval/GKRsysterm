@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Provider, useApp } from "./store";
 import { isMock } from "./api";
+import { canReview } from "./auth";
 import { Home } from "./pages/Explore";
 import { Explore } from "./pages/Atlas";
 import "./styles.css";
@@ -26,6 +27,7 @@ const Content = lazy(() => import("./pages/Content"));
 const Planning = lazy(() => import("./pages/Planning"));
 const Account = lazy(() => import("./pages/Account"));
 const Chat = lazy(() => import("./pages/Chat"));
+const Login = lazy(() => import("./pages/Login"));
 const nav = [
   { path: "/", label: "启航", en: "Overview", icon: Compass },
   { path: "/explore", label: "院校星图", en: "Explore", icon: Telescope },
@@ -111,6 +113,7 @@ function App() {
       "/lighthouse": "灯塔计划",
       "/admin": "审核工作台",
       "/me": "我的夜航",
+      "/login": "登录夜航",
     }[path] ||
     (path.startsWith("/echoes/")
       ? "回声广场"
@@ -222,10 +225,12 @@ function App() {
             <span>灯塔计划</span>
             <ArrowUpRight size={14} />
           </button>
-          <button onClick={() => navigate("/admin")}>
-            <ShieldCheck size={18} />
-            <span>内容审核</span>
-          </button>
+          {canReview(data.user) && (
+            <button onClick={() => navigate("/admin")}>
+              <ShieldCheck size={18} />
+              <span>内容审核</span>
+            </button>
+          )}
           <div className="sidebar-note">
             <span>✧</span>
             <p>
@@ -234,12 +239,15 @@ function App() {
               <small>让真实的经验，为你点灯。</small>
             </p>
           </div>
-          <button className="user" onClick={() => navigate("/me")}>
+          <button
+            className="user"
+            onClick={() => navigate(data.user ? "/me" : "/login")}
+          >
             <span className="avatar">
               <UserRound size={19} />
             </span>
             <span>
-              {data.user?.name || "登录 / 注册"}
+              {data.user?.name || "登录"}
               <small>{data.user ? "我的夜航档案" : "保存你的探索进度"}</small>
             </span>
             <ChevronRight size={14} />
@@ -272,7 +280,9 @@ function App() {
         </div>
         <main id="main" tabIndex={-1}>
           <Suspense fallback={<div className="empty">正在展开页面…</div>}>
-            {path === "/" ? (
+            {path === "/login" ? (
+              <Login />
+            ) : path === "/" ? (
               <Home openChat={() => setChat(true)} />
             ) : path === "/explore" ? (
               <Explore />

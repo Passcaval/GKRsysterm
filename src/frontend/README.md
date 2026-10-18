@@ -8,16 +8,17 @@
 
 ## 启动
 
-需要 Node.js 22.18+（建议 24 LTS）、pnpm 10.26+。在本目录运行：
+需要 Node.js 22.18+（当前验证为 24）、pnpm 11.25.0（与 packageManager 一致）。在本目录运行：
 
 ```powershell
-pnpm install
+pnpm install --frozen-lockfile
 pnpm run dev
 ```
 
 打开 http://127.0.0.1:5173 。默认 `mock` 演示模式，完全不需要后端。首次安装后的版本以 `pnpm-lock.yaml` 为准。
 
 ```powershell
+pnpm run contract:check
 pnpm run test
 pnpm run build
 pnpm run preview
@@ -52,6 +53,7 @@ v0.3：回声广场按院校独立展示。星图选中院校后点击右下角�
 
 | 页面       | 地址                   | 可操作内容                                                |
 | ---------- | ---------------------- | --------------------------------------------------------- |
+| 统一登录   | `/#/login`             | 邮箱或用户ID＋密码；账号权限由服务端决定，无身份选择        |
 | 启航       | `/#/`                  | 自然语言入口、星图预览、画像摘要、回声来信                |
 | 考生档案   | `/#/profile`           | 分步 / 完整表单、校验、选科、偏好、授权                   |
 | 院校星图   | `/#/explore`           | 关键词 / 城市 / 专业过滤、缩放、星图 / 列表切换           |
@@ -68,16 +70,27 @@ v0.3：回声广场按院校独立展示。星图选中院校后点击右下角�
 
 移动端自适应布局；响应系统减少动效设置；星图可用键盘选择，也可切换列表。已移除家长模式，旧的本地模式记录不再影响界面或动画。
 
-演示审核流程：进入「我的」→「切换演示角色」→「内容审核员」→「内容审核」。可以先在灯塔计划投稿，再在队列中写明理由通过或拒绝。角色选择器在 HTTP 模式不存在；正式权限必须由后端控制。
+统一登录页为 `/#/login`，只填写“邮箱或用户 ID”和密码，不选择身份。普通账号进入“我的”，内容审核员或管理员进入当前已有的内容审核工作台；普通账号不显示管理入口，直接访问也不能加载审核队列。HTTP 模式下身份来自后端响应，不通过登录请求提交。
+
+本地演示账号（仅 Mock 有效，统一密码 `NightVoyageDemo!`）：
+
+| 邮箱 | 用户 ID | 预置权限 |
+| --- | --- | --- |
+| student@example.test | U0000000001 | 普通用户 |
+| contributor@example.test | U0000000002 | 学校认证贡献者 |
+| reviewer@example.test | U0000000003 | 内容审核员 |
+| admin@example.test | U0000000004 | 管理员（当前管理页仅有内容审核） |
+
+可先投稿，再退出并使用审核账号登录，在队列中填写理由通过或拒绝。演示账号与密码均为公开测试夹具，不得用于生产；真实密码验证、会话和权限必须由后端实现。登录页不展示上述身份说明。
 
 ## 交付文档
 
 - [中文接口对接规范](docs/API.md)：请求响应、权限、错误、SSE、版本、文件上传、FastAPI 接入示例。
-- [OpenAPI 3.1 契约](docs/openapi.json)：可导入 Swagger Editor / Apifox / Postman，包含完整模型。
+- [OpenAPI 3.1 契约](docs/openapi.json)：可导入 Swagger Editor / Apifox / Postman，包含当前前端模型，完整目标业务的差距见主技术方案。
 - [前端架构与功能边界](docs/FRONTEND.md)：选型、目录、模块映射、设计与后续事项。
 - [验证记录与验收步骤](docs/VALIDATION.md)。
 
-接口类型在 `src/types.ts`，唯一业务访问层在 `src/api.ts`。修改契约时同时维护这两处与 `scripts/contract.mjs`，执行 `node scripts/contract.mjs` 重新生成 JSON。
+接口类型在 `src/types.ts`，唯一业务访问层在 `src/api.ts`。修改契约时同时维护这两处与 `scripts/contract.mjs`，执行 `pnpm run contract` 同时生成仓库 `docs/contracts/openapi.json` 与前端兼容副本，再执行 `pnpm run contract:check` 检查一致性。中文接口规范统一维护在仓库 `docs/contracts/API.md`。
 
 ## 演示范围
 

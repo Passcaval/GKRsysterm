@@ -13,6 +13,7 @@ const { build } = await import(
 test("真实HTTP适配：响应信封、写请求头、409冲突、SSE中文分块与中止", async () => {
   let received: unknown;
   let csrf = "";
+  let receivedPath = "";
   const server = createServer(async (req, res) => {
     if (req.url === "/api/v1/chat/stream") {
       res.writeHead(200, { "Content-Type": "text/event-stream" });
@@ -29,6 +30,7 @@ test("真实HTTP适配：响应信封、写请求头、409冲突、SSE中文分�
     let body = "";
     for await (const chunk of req) body += chunk;
     received = body ? JSON.parse(body) : undefined;
+    receivedPath = req.url || "";
     csrf = String(req.headers["x-requested-with"] || "");
     res.setHeader("Content-Type", "application/json");
     if (req.url === "/api/v1/me/plan") {
@@ -43,6 +45,38 @@ test("真实HTTP适配：响应信封、写请求头、409冲突、SSE中文分�
     }
     if (req.url === "/api/v1/recommendations") {
       res.end(JSON.stringify({ data: [], requestId: "req-ok" }));
+      return;
+    }
+    if (req.url === "/api/v1/auth/login") {
+      const identifier = (received as { identifier: string }).identifier;
+      if (
+        identifier === "invalid@@example.test" ||
+        identifier === "missing-at.example.test"
+      ) {
+        res.writeHead(422);
+        res.end(
+          JSON.stringify({
+            error: {
+              code: "IDENTIFIER_INVALID",
+              message: "邮箱或用户 ID 格式不正确，请重新输入。",
+              details: [
+                {
+                  field: "identifier",
+                  message: "请输入有效邮箱或系统分配的用户 ID",
+                },
+              ],
+            },
+            requestId: "req-identifier-invalid",
+          }),
+        );
+        return;
+      }
+      res.end(
+        JSON.stringify({
+          data: { id: "u-http", name: "测试", role: "admin", verified: false },
+          request_id: "req-login",
+        }),
+      );
       return;
     }
     res.end(JSON.stringify({ data: null, requestId: "req-ok" }));
@@ -68,6 +102,36 @@ test("真实HTTP适配：响应信封、写请求头、409冲突、SSE中文分�
     });
     const { api, ApiError, isMock } = await import(outfile.href);
     assert.equal(isMock, false);
+    // Server rejection reaches the existing page through Error.message; correcting
+    // the input must then allow the following successful login with the same client.
+    for (const identifier of [
+      "invalid@@example.test",
+      "missing-at.example.test",
+    ]) {
+      await assert.rejects(
+        api.login(identifier, "test-password"),
+        (e: unknown) =>
+          e instanceof ApiError &&
+          (e as { status: number }).status === 422 &&
+          (e as Error).message === "邮箱或用户 ID 格式不正确，请重新输入。" &&
+          (e as { requestId: string }).requestId === "req-identifier-invalid",
+      );
+      assert.deepEqual(received, {
+        login_type: identifier.includes("@") ? "email" : "user_id",
+        identifier,
+        password: "test-password",
+      });
+    }
+    const user = await api.login("admin@example.test", " exact password ");
+    assert.equal(user.role, "admin");
+    assert.equal(receivedPath, "/api/v1/auth/login");
+    assert.deepEqual(received, {
+      login_type: "email",
+      identifier: "admin@example.test",
+      password: " exact password ",
+    });
+    await api.logout();
+    assert.equal(receivedPath, "/api/v1/auth/logout");
     assert.deepEqual(await api.recommendations(63), []);
     assert.deepEqual(received, { riskPreference: 63 });
     assert.equal(csrf, "NightVoyage");
