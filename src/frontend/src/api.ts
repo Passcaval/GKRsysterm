@@ -12,6 +12,8 @@ import type {
 import { initial } from "./data";
 import { classify, eligible, validateProfile } from "./domain";
 import { EventDecoder } from "./sse";
+import { canReview, loginInput } from "./auth";
+import { authenticateDemo } from "./demo-auth";
 export const isMock = import.meta.env?.VITE_API_MODE !== "http";
 const BASE = (import.meta.env?.VITE_API_BASE_URL || "/api/v1").replace(
   /\/$/,
@@ -93,7 +95,7 @@ async function request<T>(
       throw new ApiError(
         response.status,
         value?.error?.message || `请求失败（${response.status}）`,
-        value?.requestId,
+        value?.request_id ?? value?.requestId,
       );
     if (!value || !("data" in value))
       throw new ApiError(502, "接口返回格式不符合约定");
@@ -117,26 +119,19 @@ export const api = {
     await delay();
     return db();
   },
-  async login(
-    name: string,
-    password: string,
-    role: User["role"] = "student",
-  ): Promise<User> {
-    if (!isMock)
-      return request("/auth/session", "POST", { username: name, password });
+  async login(identifier: string, password: string): Promise<User> {
+    const input = loginInput(identifier, password);
+    if (!isMock) return request("/auth/login", "POST", input);
     await delay();
+    const user = authenticateDemo(input);
+    if (!user) throw new ApiError(401, "账号或密码错误");
     const d = db();
-    d.user = {
-      id: "demo-" + role,
-      name: name || "未来的航海家",
-      role,
-      verified: role !== "student",
-    };
+    d.user = user;
     save(d);
     return d.user;
   },
   async logout() {
-    if (!isMock) return request<null>("/auth/session", "DELETE");
+    if (!isMock) return request<null>("/auth/logout", "POST");
     const d = db();
     d.user = null;
     save(d);
@@ -366,7 +361,7 @@ export const api = {
   async moderation(): Promise<Post[]> {
     if (!isMock) return request("/admin/reviews");
     const d = db();
-    if (d.user?.role !== "reviewer") throw new ApiError(403, "需要审核员权限");
+    if (!canReview(d.user)) throw new ApiError(403, "需要内容审核权限");
     return d.posts.filter((p) => p.status === "pending");
   },
   async review(
@@ -380,7 +375,8 @@ export const api = {
         reason,
       });
     const d = db();
-    if (d.user?.role !== "reviewer") throw new ApiError(403, "需要审核员权限");
+    if (!d.user || !canReview(d.user))
+      throw new ApiError(403, "需要内容审核权限");
     const p = d.posts.find((p) => p.id === postId);
     if (!p) throw new Error("帖子不存在");
     if (p.status !== "pending") throw new ApiError(409, "该帖子已处理");

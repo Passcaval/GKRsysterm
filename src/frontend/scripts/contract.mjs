@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
 const str = (extra = {}) => ({ type: "string", ...extra });
 const int = (extra = {}) => ({ type: "integer", ...extra });
@@ -16,7 +16,7 @@ const schemas = {
   User: obj({
     id: str(),
     name: str(),
-    role: en(["student", "contributor", "reviewer"]),
+    role: en(["student", "contributor", "reviewer", "admin"]),
     verified: bool,
   }),
   Profile: obj({
@@ -158,7 +158,8 @@ const schemas = {
     requestId: str(),
   }),
   LoginRequest: obj({
-    username: str({ minLength: 1, maxLength: 128 }),
+    login_type: en(["email", "user_id"]),
+    identifier: str({ minLength: 1, maxLength: 254 }),
     password: str({ minLength: 1, maxLength: 256 }),
   }),
   PostInput: obj({
@@ -284,13 +285,59 @@ operation("/bootstrap", "get", "加载当前可见的初始视图", ref("Bootstr
     "v0.1 聚合快照。匿名返回公开院校与已发布帖子，个人字段为空；仅审核员可收到完整待审内容。所有 sourceIds 必须可解析。当前前端对快照做本地筛选，不适用于无限数据集合。",
 });
 operation(
-  "/auth/session",
+  "/auth/login",
   "post",
-  "登录并设置 HttpOnly 安全会话",
+  "统一登录：由服务端确定身份并设置 HttpOnly 安全会话",
   ref("User"),
-  { input: ref("LoginRequest"), publicAccess: true },
+  {
+    input: ref("LoginRequest"),
+    publicAccess: true,
+    description:
+      "沿用统一登录请求。login_type仅为标识类型，不是校验结果或用户角色。后端独立校验邮箱或系统ID，格式不合格返回422，error.message须包含原因和重新输入提示；合法格式但认证失败返回统一401，不泄露账号是否存在。",
+  },
 );
-operation("/auth/session", "delete", "退出并吊销会话", { type: "null" });
+paths["/auth/login"].post.responses[422] = {
+  description:
+    "后端校验标识失败；不签发会话。前端沿用现有错误展示，保留输入并允许修改重试。",
+  content: {
+    "application/json": {
+      schema: ref("Error"),
+      examples: {
+        invalidEmail: {
+          value: {
+            error: {
+              code: "EMAIL_INVALID",
+              message: "邮箱格式不正确，请重新输入。",
+              details: [
+                {
+                  field: "identifier",
+                  message: "请输入符合格式要求的邮箱地址",
+                },
+              ],
+            },
+            requestId: "req-email-invalid",
+          },
+        },
+        invalidIdentifier: {
+          value: {
+            error: {
+              code: "IDENTIFIER_INVALID",
+              message: "邮箱或用户 ID 格式不正确，请重新输入。",
+              details: [
+                {
+                  field: "identifier",
+                  message: "请输入有效邮箱或系统分配的用户 ID",
+                },
+              ],
+            },
+            requestId: "req-identifier-invalid",
+          },
+        },
+      },
+    },
+  },
+};
+operation("/auth/logout", "post", "退出并吊销会话", { type: "null" });
 operation("/me/profile", "put", "完整替换考生档案", ref("Profile"), {
   input: ref("Profile"),
 });
@@ -375,7 +422,7 @@ operation(
 );
 operation("/admin/reviews", "get", "获取审核员可见待审队列", arr(ref("Post")), {
   description:
-    "要求reviewer，普通用户403。包含待审帖子、可信度分项和可见证据。",
+    "要求reviewer或admin，普通用户403。包含待审帖子、可信度分项和可见证据；不授予注册审批权限。",
 });
 operation(
   "/admin/reviews/{postId}",
@@ -385,7 +432,7 @@ operation(
   {
     input: ref("ReviewInput"),
     description:
-      "reviewer专用；pending→published或rejected，已处理返回409；写入不可变审计记录。",
+      "reviewer或admin可用；pending→published或rejected，已处理返回409；写入不可变审计记录。",
   },
 );
 operation("/chat/stream", "post", "POST SSE流式Agent对话", ref("ChatEvent"), {
@@ -429,10 +476,31 @@ const contract = {
     schemas,
   },
 };
-writeFileSync(
+const outputs = [
   new URL("../docs/openapi.json", import.meta.url),
-  JSON.stringify(contract, null, 2) + "\n",
-);
+  new URL("../../../docs/contracts/openapi.json", import.meta.url),
+];
+const serialized = JSON.stringify(contract, null, 2) + "\n";
+const check = process.argv.includes("--check");
+for (const output of outputs) {
+  if (check) {
+    let actual;
+    try {
+      actual = readFileSync(output, "utf8");
+    } catch {
+      throw new Error(
+        `Missing contract: ${output.pathname}; run pnpm run contract`,
+      );
+    }
+    if (actual.replace(/\r\n/g, "\n") !== serialized)
+      throw new Error(
+        `Stale contract: ${output.pathname}; run pnpm run contract`,
+      );
+  } else {
+    mkdirSync(new URL(".", output), { recursive: true });
+    writeFileSync(output, serialized);
+  }
+}
 console.log(
-  `OpenAPI generated: ${Object.values(paths).reduce((n, p) => n + Object.keys(p).length, 0)} operations, ${Object.keys(schemas).length} schemas`,
+  `OpenAPI ${check ? "verified" : "generated"} in both locations: ${Object.values(paths).reduce((n, p) => n + Object.keys(p).length, 0)} operations, ${Object.keys(schemas).length} schemas`,
 );

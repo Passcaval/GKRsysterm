@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store";
 import { api, isMock } from "../api";
+import { canReview } from "../auth";
 import { sampleProfile } from "../data";
 import { validateProfile } from "../domain";
 import {
@@ -28,7 +29,7 @@ import {
   SignalBadge,
   Evidence,
 } from "../components";
-import type { Profile, Post, User } from "../types";
+import type { Profile, Post } from "../types";
 function ProfilePage() {
   const { data, update, notify, navigate } = useApp();
   const [value, setValue] = useState<Profile>(
@@ -351,11 +352,7 @@ function ProfilePage() {
 }
 function Me() {
   const { data, update, notify, navigate, refresh } = useApp();
-  const [login, setLogin] = useState(false);
   const [clear, setClear] = useState(false);
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<User["role"]>("student");
   const [busy, setBusy] = useState(false);
   return (
     <>
@@ -370,11 +367,11 @@ function Me() {
           <h2>{data.user ? "我的账号" : "登录以保存你的探索"}</h2>
           <p className="muted">
             {data.user
-              ? `当前角色：${{ student: "考生", contributor: "认证贡献者", reviewer: "内容审核员" }[data.user.role]}`
+              ? `当前角色：${{ student: "考生", contributor: "认证贡献者", reviewer: "内容审核员", admin: "管理员" }[data.user.role]}`
               : "登录后保存你的档案、收藏和志愿草案。"}
           </p>
-          <button className="button" onClick={() => setLogin(true)}>
-            {data.user ? (isMock ? "切换演示角色" : "切换账号") : "登录账号"}
+          <button className="button" onClick={() => navigate("/login")}>
+            {data.user ? "切换账号" : "登录账号"}
           </button>
           {data.user && (
             <button
@@ -382,8 +379,25 @@ function Me() {
               onClick={async () => {
                 try {
                   await api.logout();
-                  await refresh();
+                  update({
+                    user: null,
+                    profile: null,
+                    favorites: [],
+                    verifications: [],
+                    posts: data.posts.filter(
+                      (p) => p.status === "published" && !p.isMine,
+                    ),
+                    plan: {
+                      id: "",
+                      name: "我的志愿草案",
+                      version: 1,
+                      entries: [],
+                    },
+                  });
+                  localStorage.removeItem("nv-compare");
+                  sessionStorage.removeItem("nv-question");
                   notify("已退出账号");
+                  navigate("/login");
                 } catch (e) {
                   notify((e as Error).message);
                 }
@@ -461,71 +475,6 @@ function Me() {
             </span>
           </div>
         ))}
-      {login && (
-        <Modal
-          title={isMock ? "进入演示账号" : "登录夜航"}
-          onClose={() => setLogin(false)}
-        >
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setBusy(true);
-              try {
-                await api.login(name, password, role);
-                await refresh();
-                setLogin(false);
-                notify("已登录");
-              } catch (e) {
-                notify((e as Error).message);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <label>
-              账号
-              <input
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoComplete="username"
-              />
-            </label>
-            {isMock ? (
-              <label>
-                演示角色
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as User["role"])}
-                >
-                  <option value="student">考生</option>
-                  <option value="contributor">认证贡献者</option>
-                  <option value="reviewer">内容审核员</option>
-                </select>
-              </label>
-            ) : (
-              <label>
-                密码
-                <input
-                  required
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-              </label>
-            )}
-            {isMock && (
-              <p className="muted">
-                角色切换只用于本地演示，正式账号需要相应权限。
-              </p>
-            )}
-            <button className="button gold-button" disabled={busy}>
-              {busy ? "正在登录…" : "登录"}
-            </button>
-          </form>
-        </Modal>
-      )}
       {clear && (
         <Modal title="清除个人数据" onClose={() => setClear(false)}>
           <p>这将清除考生档案、收藏和志愿草案等个人记录，清除后无法恢复。</p>
@@ -818,7 +767,7 @@ function Admin() {
     }
   }
   useEffect(() => {
-    if (data.user?.role === "reviewer") void load();
+    if (canReview(data.user)) void load();
   }, [data.user?.role]);
   const p = queue.find((p) => p.id === selected);
   async function review(decision: "approve" | "reject") {
@@ -840,7 +789,7 @@ function Admin() {
       setBusy(false);
     }
   }
-  if (data.user?.role !== "reviewer")
+  if (!canReview(data.user))
     return (
       <>
         <PageTitle
@@ -849,13 +798,9 @@ function Admin() {
           description="此功能仅向内容审核员开放，用于核验来信与引用证据。"
         />
         <Empty
-          text={
-            isMock
-              ? "请在“我的”切换为内容审核员，体验审核流程。"
-              : "当前账号没有内容审核权限。"
-          }
-          action="前往我的账号"
-          onAction={() => navigate("/me")}
+          text={data.user ? "当前账号没有内容审核权限。" : "请先登录。"}
+          action={data.user ? "返回我的账号" : "前往登录"}
+          onAction={() => navigate(data.user ? "/me" : "/login")}
         />
       </>
     );

@@ -2172,6 +2172,31 @@ kbd {
   justify-content: center;
   margin-top: 24px;
 }
+.login-page {
+  min-height: 65vh;
+  display: grid;
+  place-items: center;
+  padding: 32px 0;
+}
+.login-panel {
+  width: min(100%, 440px);
+}
+.login-panel h1 {
+  font-size: 30px;
+}
+.login-panel form {
+  display: grid;
+  gap: 12px;
+  margin: 28px 0 20px;
+}
+.login-panel input {
+  width: 100%;
+  min-width: 0;
+}
+.login-panel form .button {
+  margin-top: 12px;
+  justify-content: center;
+}
 .account-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

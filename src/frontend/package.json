@@ -14,6 +14,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "contract": "node scripts/contract.mjs",
+    "contract:check": "node scripts/contract.mjs --check",
     "standalone": "node scripts/standalone.mjs",
     "format": "prettier --write src tests scripts vite.config.ts"
   },
