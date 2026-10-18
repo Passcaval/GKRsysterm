@@ -40,7 +40,7 @@ def test_real_frontend_adapter_over_http(app, student, published):
             time.sleep(0.05)
         assert server.started
         env = {**os.environ, "NV_TEST_API": f"http://127.0.0.1:{port}/api/v1"}
-        script = Path(__file__).resolve().parents[2] / "frontend/scripts/backend-smoke.mjs"
+        script = Path(__file__).resolve().parents[1] / "integration/backend-smoke.mjs"
         result = subprocess.run(
             ["node", str(script)],
             env=env,

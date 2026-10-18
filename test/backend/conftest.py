@@ -66,6 +66,14 @@ def app(database_url, tmp_path):
 
 
 @pytest.fixture
+def modern(app):
+    """Default production v0.4 API over the same isolated PostgreSQL fixtures."""
+    application = create_app(app.state.settings)
+    with TestClient(application, headers=HEADERS) as client:
+        yield client
+
+
+@pytest.fixture
 def client(app):
     with TestClient(app, headers=HEADERS) as client:
         yield client

@@ -2,17 +2,14 @@ import json
 from pathlib import Path
 from uuid import UUID
 
-import pytest
-from conftest import HEADERS, PASSWORD
-from fastapi.testclient import TestClient
+from conftest import PASSWORD
 from jsonschema import Draft202012Validator
 
 from app.db.models import Post
-from app.main import create_app
 from app.workers.runner import tick
 
 CONTRACT = json.loads(
-    (Path(__file__).resolve().parents[3] / "docs/contracts/openapi.json").read_text(
+    (Path(__file__).resolve().parents[2] / "docs/contracts/openapi.json").read_text(
         encoding="utf-8"
     )
 )
@@ -22,13 +19,6 @@ def validate(name, value):
     Draft202012Validator(
         {"$ref": "#/components/schemas/" + name, "components": CONTRACT["components"]}
     ).validate(value)
-
-
-@pytest.fixture
-def modern(app):
-    application = create_app(app.state.settings)
-    with TestClient(application, headers=HEADERS) as client:
-        yield client
 
 
 def sign_in(client, email="admin@example.test"):

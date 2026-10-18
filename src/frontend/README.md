@@ -30,7 +30,7 @@ pnpm run standalone
 若本机 pnpm 的启动包装器有问题，可直接执行等价命令：
 
 ```powershell
-node --experimental-strip-types --test tests/*.test.ts
+node --experimental-strip-types --test ../../test/frontend/*.test.ts
 node node_modules/typescript/bin/tsc -b
 node node_modules/vite/bin/vite.js build
 node node_modules/vite/bin/vite.js --host 127.0.0.1

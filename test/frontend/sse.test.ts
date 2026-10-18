@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EventDecoder } from "../src/sse.ts";
+import { EventDecoder } from "../../src/frontend/src/sse.ts";
 test("SSE handles byte/chunk boundaries, CRLF, comments, and multiple events", () => {
   const p = new EventDecoder();
   assert.deepEqual(

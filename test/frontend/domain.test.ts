@@ -6,8 +6,12 @@ import {
   eligible,
   moveEntry,
   rankPosition,
-} from "../src/domain.ts";
-import type { Profile, School, PlanEntry } from "../src/types.ts";
+} from "../../src/frontend/src/domain.ts";
+import type {
+  Profile,
+  School,
+  PlanEntry,
+} from "../../src/frontend/src/types.ts";
 const profile: Profile = {
   province: "浙江",
   year: 2026,
