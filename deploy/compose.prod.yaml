@@ -1,0 +1,47 @@
+name: night-voyage
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: night_voyage
+      POSTGRES_USER: night_voyage
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U night_voyage -d night_voyage"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  api:
+    build:
+      context: ..
+      dockerfile: src/backend/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    depends_on:
+      postgres: { condition: service_healthy }
+    volumes: [private_storage:/app/runtime/private]
+  worker:
+    build:
+      context: ..
+      dockerfile: src/backend/Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "app.workers.runner"]
+    env_file: .env
+    environment:
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    depends_on:
+      postgres: { condition: service_healthy }
+    volumes: [private_storage:/app/runtime/private]
+  frontend:
+    build: { context: ../src/frontend }
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ["${HTTP_PORT:-8080}:80"]
+volumes:
+  postgres_data:
+  private_storage:
