@@ -43,6 +43,7 @@ from app.modules.profiles.service import current_profile, save_profile
 from app.modules.protocol.service import (
     application_view,
     internal_profile,
+    optional_questions,
     page,
     profile_view,
     questions,
@@ -85,10 +86,13 @@ def not_implemented():
 
 def all_schools(db):
     # v0.4 permits unknown ranks and tuition. Never omit unknown-only schools.
-    views = {s["id"]: wire(s) for s in school_views(db)}
     units = active_units(db)
+    grouped: dict = {}
+    for unit in units:
+        grouped.setdefault(unit.school_id, []).append(unit)
+    views = {s["id"]: wire(s) for s in school_views(db, units)}
     for s in db.scalars(select(School).order_by(School.code)):
-        group = [u for u in units if u.school_id == s.id]
+        group = grouped.get(s.id, [])
         if str(s.id) not in views:
             views[str(s.id)] = {
                 "id": str(s.id),
@@ -463,6 +467,7 @@ def answer(
         }
     )
     allowed = {q["field"] for q in questions(run.snapshot)}
+    allowed |= {q["field"] for q in optional_questions(run.snapshot)}
     if set(data["answers"]) - allowed:
         raise DomainError(422, "INVALID_INPUT", "答案包含本次补问以外的字段。")
     try:

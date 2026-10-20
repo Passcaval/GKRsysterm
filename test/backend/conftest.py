@@ -57,6 +57,10 @@ def app(database_url, tmp_path):
         storage_dir=tmp_path / "private",
         auth_rate_limit=10000,
         registration_rate_limit=10000,
+        # Never let a developer's real .env make tests call a live model.
+        model_base_url=None,
+        model_api_key=None,
+        model_name=None,
     )
     application = create_app(settings, contract_version="0.1")
     with application.state.sessions.begin() as db:

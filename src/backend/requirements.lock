@@ -22,6 +22,8 @@ attrs==26.1.0
     # via
     #   jsonschema
     #   referencing
+beautifulsoup4==4.15.0
+    # via -r requirements.in
 certifi==2026.7.22
     # via
     #   httpcore
@@ -32,6 +34,8 @@ click==8.5.0
     # via uvicorn
 colorama==0.4.6
     # via pytest
+et-xmlfile==2.0.0
+    # via openpyxl
 fastapi==0.143.5
     # via -r requirements.in
 greenlet==3.5.6
@@ -58,6 +62,8 @@ mako==1.4.3
     # via alembic
 markupsafe==3.0.4
     # via mako
+openpyxl==3.1.5
+    # via -r requirements.in
 opentelemetry-api==1.45.1
     # via fastapi
 packaging==26.3
@@ -102,6 +108,8 @@ rpds-py==2026.9.1
     #   referencing
 ruff==0.17.1
     # via -r requirements.in
+soupsieve==3.0.3
+    # via beautifulsoup4
 sqlalchemy==2.0.55
     # via
     #   -r requirements.in
@@ -112,6 +120,7 @@ typing-extensions==4.16.0
     # via
     #   alembic
     #   anyio
+    #   beautifulsoup4
     #   fastapi
     #   opentelemetry-api
     #   psycopg
@@ -130,4 +139,6 @@ typing-inspection==0.4.4
 tzdata==2026.5
     # via psycopg
 uvicorn==0.54.0
+    # via -r requirements.in
+xlrd==2.0.2
     # via -r requirements.in

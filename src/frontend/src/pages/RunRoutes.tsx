@@ -7,10 +7,70 @@ import type {
   CreateRunInput,
   RecommendationRun,
   RecommendationItem,
+  RecommendationBranch,
   School,
 } from "../types";
 import { terminalRuns, runLabels, visibleRunItems } from "../workflow-domain";
 import { ApiError, errorText, beijingTime } from "../transport";
+
+function BranchCard({
+  branch,
+  items,
+  onEvidence,
+}: {
+  branch: RecommendationBranch;
+  items: RecommendationItem[];
+  onEvidence: (ids: string[]) => void;
+}) {
+  const { data } = useApp();
+  const selected = branch.itemIds
+    .map((id) => items.find((item) => item.recommendationItemId === id))
+    .filter((item): item is RecommendationItem => Boolean(item));
+  return (
+    <article className="panel branch-card">
+      <h3>{branch.title}</h3>
+      <p>{branch.summary}</p>
+      <div className="form-grid">
+        <div>
+          <strong>可能的好处</strong>
+          <ul>
+            {branch.pros.map((value) => (
+              <li key={value}>{value}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <strong>需要接受的代价 / 风险</strong>
+          <ul>
+            {branch.cons.map((value) => (
+              <li key={value}>{value}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      {selected.length > 0 && (
+        <div className="branch-items">
+          {selected.map((item) => {
+            const school = data.schools.find((entry) => entry.id === item.schoolId);
+            return (
+              <button
+                type="button"
+                className="text-button branch-item"
+                key={item.recommendationItemId}
+                onClick={() => onEvidence(item.evidenceIds)}
+              >
+                {school?.name || item.schoolName || "院校"}
+                <br />
+                {item.major}
+                {item.eligibility.status === "unknown" ? " · 待确认" : ""}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </article>
+  );
+}
 
 function Item({
   item,
@@ -500,7 +560,9 @@ export default function RunRoutes() {
                 <input
                   required={q.required}
                   type={
-                    ["rank", "exam_year"].includes(q.field) ? "number" : "text"
+                    ["rank", "score", "exam_year"].includes(q.field)
+                      ? "number"
+                      : "text"
                   }
                   value={answers[q.field] || ""}
                   onChange={(e) =>
@@ -518,6 +580,42 @@ export default function RunRoutes() {
       {run?.validation.status === "passed" &&
         ["succeeded", "partial"].includes(run.status) && (
           <>
+            {run.missingInfo && run.missingInfo.length > 0 && (
+              <section className="panel">
+                <h2>补充这些信息，结果会更精确</h2>
+                <p className="muted">
+                  当前结果仍可参考，但下列条件未知，相关硬条件和偏好判断会保持“待确认”。
+                </p>
+                <ul>
+                  {run.missingInfo.map((item) => (
+                    <li key={item.field}>{item.text}</li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => navigate("/me")}
+                >
+                  去补充考生画像
+                </button>
+              </section>
+            )}
+            {run.branches && run.branches.length > 0 && (
+              <section>
+                <h2>多种可能的选择</h2>
+                <p className="muted">
+                  因为部分偏好尚未填写，下面不是唯一答案。每种方向都列出可能的好处和需要核对的代价；补充信息后会进一步收敛。
+                </p>
+                {run.branches.map((branch) => (
+                  <BranchCard
+                    key={branch.branchId}
+                    branch={branch}
+                    items={items}
+                    onEvidence={setEvidence}
+                  />
+                ))}
+              </section>
+            )}
             <h2>已通过校验的结果</h2>
             {["reach", "match", "safe", "unknown"].map((tier) => (
               <section key={tier} className="run-lane">

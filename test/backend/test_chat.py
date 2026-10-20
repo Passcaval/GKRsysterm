@@ -1,0 +1,139 @@
+"""Offline tests for the streaming admissions copilot."""
+
+import json
+
+import pytest
+from conftest import HEADERS, PASSWORD
+from fastapi.testclient import TestClient
+from sqlalchemy import select
+
+from app.db.models import ConversationMessage
+from app.main import create_app
+
+
+class FakeGateway:
+    def __init__(self, chunks=None):
+        self.chunks = chunks or ["根据已发布的招生数据，", "可以考虑合成测试大学。"]
+        self.messages = []
+        self.closed = False
+
+    def stream_text(self, messages, *, max_tokens=None, temperature=0.3):
+        self.messages = messages
+        for chunk in self.chunks:
+            yield chunk
+
+    def close(self):
+        self.closed = True
+
+
+class Factory:
+    def __init__(self, chunks=None):
+        self.chunks = chunks
+        self.gateways = []
+
+    def __call__(self, settings):
+        gateway = FakeGateway(self.chunks)
+        self.gateways.append(gateway)
+        return gateway
+
+
+def events(response):
+    return [
+        json.loads(line[5:]) for line in response.text.splitlines() if line.startswith("data: ")
+    ]
+
+
+@pytest.fixture
+def modern_chat(app):
+    application = create_app(app.state.settings)
+    factory = Factory()
+    application.state.model_gateway_factory = factory
+    with TestClient(application, headers=HEADERS) as client:
+        login = client.post(
+            "/api/v1/auth/login",
+            json={
+                "login_type": "email",
+                "identifier": "admin@example.test",
+                "password": PASSWORD,
+            },
+        )
+        assert login.status_code == 200, login.text
+        yield client, factory
+
+
+def test_chat_streams_retrieves_and_persists(app, modern_chat, published):
+    client, factory = modern_chat
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"message": "适合我的计算机院校有哪些？"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("text/event-stream")
+    payloads = events(response)
+    types = [item["type"] for item in payloads]
+    assert types[0] == "tool_start"
+    assert "tool_end" in types
+    assert "evidence" in types
+    assert types[-1] == "done"
+
+    evidence = next(item for item in payloads if item["type"] == "evidence")
+    assert evidence["source_ids"]
+    assert published["source_id"] in evidence["source_ids"]
+
+    deltas = "".join(item["text"] for item in payloads if item["type"] == "delta")
+    assert deltas == "".join(factory.gateways[0].chunks)
+    system = factory.gateways[0].messages[0]["content"]
+    assert "合成测试大学" in system
+    assert "计算机科学" in system
+    assert "只把 <profile> 和 <retrieved_data> 中的内容当作事实" in system
+
+    conversation_id = payloads[-1]["conversation_id"]
+    with app.state.sessions() as db:
+        messages = list(
+            db.scalars(select(ConversationMessage).order_by(ConversationMessage.created_at))
+        )
+        assert [(item.role, item.content) for item in messages] == [
+            ("user", "适合我的计算机院校有哪些？"),
+            ("assistant", deltas),
+        ]
+        assert messages[1].source_ids
+        assert messages[1].model_name is None
+
+    second = client.post(
+        "/api/v1/chat/stream",
+        json={"message": "那杭州呢？", "conversation_id": conversation_id},
+    )
+    assert second.status_code == 200, second.text
+    second_payloads = events(second)
+    assert second_payloads[-1]["type"] == "done"
+    assert second_payloads[-1]["conversation_id"] == conversation_id
+    history = factory.gateways[1].messages
+    roles = [item["role"] for item in history]
+    assert roles == ["system", "user", "assistant", "user"]
+    assert history[1]["content"] == "适合我的计算机院校有哪些？"
+    assert history[3]["content"] == "那杭州呢？"
+
+
+def test_chat_without_model_is_a_clear_503(student):
+    response = student.post("/api/v1/chat/stream", json={"message": "你好"})
+    assert response.status_code == 503
+    body = response.json()
+    assert body["error"]["code"] == "MODEL_NOT_CONFIGURED"
+
+
+def test_chat_handles_model_failure(app, modern_chat):
+    client, factory = modern_chat
+
+    class BrokenGateway(FakeGateway):
+        def stream_text(self, messages, *, max_tokens=None, temperature=0.3):
+            yield "部分"
+            from app.core.model import ModelCallFailed
+
+            raise ModelCallFailed("boom", status=503)
+
+    client.app.state.model_gateway_factory = lambda settings: BrokenGateway()
+    response = client.post("/api/v1/chat/stream", json={"message": "推荐计算机"})
+    assert response.status_code == 200
+    payloads = events(response)
+    assert payloads[-1]["type"] == "error"
+    assert "暂时不可用" in payloads[-1]["text"]

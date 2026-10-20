@@ -27,6 +27,7 @@ export class EventDecoder {
           "tool_end",
           "delta",
           "evidence",
+          "profile_update",
           "done",
           "error",
         ].includes(value.type)
@@ -40,7 +41,18 @@ export class EventDecoder {
         (value.type === "done" && typeof value.conversationId !== "string") ||
         (value.type === "evidence" &&
           (!Array.isArray(value.sourceIds) ||
-            !value.sourceIds.every((x) => typeof x === "string")))
+            !value.sourceIds.every((x) => typeof x === "string"))) ||
+        (value.type === "profile_update" &&
+          (typeof value.signalId !== "string" ||
+            typeof value.question !== "string" ||
+            !Number.isInteger(value.expectedVersion) ||
+            !Array.isArray(value.changes) ||
+            value.changes.some(
+              (change: { field?: unknown; label?: unknown } | null) =>
+                !change ||
+                typeof change.field !== "string" ||
+                typeof change.label !== "string",
+            )))
       )
         throw new Error("SSE 事件字段不符合契约");
       events.push(value);

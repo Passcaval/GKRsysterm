@@ -13,21 +13,24 @@ class ProfileInput(StrictModel):
     year: int = Field(ge=2024, le=2035)
     score: int = Field(ge=0, le=900)
     rank: int = Field(ge=1, le=5000000)
+    # Only province, year, score and rank are required for a recommendation.
+    # The remaining fields are optional and are surfaced as follow-up prompts
+    # when absent; recommendations still run in an explicitly "unknown" state.
     subjects: list[Literal["物理", "化学", "生物", "历史", "地理", "政治", "技术"]] = Field(
-        min_length=3, max_length=3
+        default_factory=list, max_length=3
     )
-    cities: list[str] = Field(max_length=30)
-    interests: list[str] = Field(max_length=30)
-    budget: float = Field(ge=0, le=10000000, allow_inf_nan=False)
-    acceptAdjustment: bool
+    cities: list[str] = Field(default_factory=list, max_length=30)
+    interests: list[str] = Field(default_factory=list, max_length=30)
+    budget: float | None = Field(default=None, ge=0, le=10000000, allow_inf_nan=False)
+    acceptAdjustment: bool = False
     consent: Literal[True]
     rank_cohort: str | None = Field(default=None, max_length=80)
     batch: str | None = Field(default=None, max_length=30)
 
     @model_validator(mode="after")
     def unique_subjects(self):
-        if len(set(self.subjects)) != 3:
-            raise ValueError("Three distinct subjects required")
+        if len(set(self.subjects)) != len(self.subjects):
+            raise ValueError("Subjects must be distinct")
         return self
 
 

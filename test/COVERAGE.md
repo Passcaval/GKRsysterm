@@ -9,6 +9,10 @@
 | 注册原始证据和审批 | `backend/test_registration.py`、`backend/test_v04.py` | 身份占用、幂等、批准/驳回、并发冲突、事务回滚、原件权限、有效/无效附件和真实WebM解码 |
 | 画像版本与按需补问 | `backend/test_v04.py`、`backend/test_workflow.py`、`frontend/workflow-domain.test.ts` | 画像更新/版本冲突、推荐补问新版本、缺失条件、跨账号访问 |
 | 官方数据导入与追溯 | `backend/test_workflow.py`、`backend/test_v04.py` | 合成JSON/CSV、来源白名单/冲突、不可变单位、证据和院校筛选 |
+| 招生自动抓取与审核 | `backend/test_crawl.py`、`frontend/crawl.test.ts` | 配置规范化/范围校验、启动触发幂等、HTTP/SSRF/大小/重定向/robots、Fake Model 链接筛选与字段抽取、XLSX 魔数识别/表头映射、证据校验、暂存不可见、审核批准/驳回/权限、Source 溯源、原文快照与 Mock 拒绝 |
+| AI 领航员与模型流式对话 | `backend/test_chat.py`、`frontend/http.test.ts`、`frontend/sse.test.ts` | 未配置模型503、SSE tool/evidence/delta/done、已发布招生数据检索与来源、会话/历史持久化、模型失败降级、格式校验；CI 使用 FakeGateway，真实 DeepSeek 手工联调 |
+| 画像模糊搜索与可选字段 | `backend/test_profile_optional.py`、`frontend/mock.test.ts`、`frontend/workflow-domain.test.ts` | 省份/分数/位次作为推荐必需项、可选字段缺失时仍生成推荐、三分支利弊与 `missing_info`、城市/专业/院校模糊建议（含错字）、最小画像不通过硬条件仍不发布 |
+| 领航员画像校准与编辑 | `backend/test_chat_profile.py`、`frontend/sse.test.ts` | 从聊天明确语句识别省份/分数/位次/选科、`profile_update` 待确认事件、确认/拒绝、画像版本递增、重复处理409、检索来源ID作为反馈、保存后可继续 PATCH 修改 |
 | 推荐、任务与校验 | `backend/test_workflow.py`、`backend/test_v04.py` | 硬条件、unknown、独立结果校验、任务租约/发布、取消、反馈归属 |
 | SSE协议与恢复 | `frontend/sse.test.ts`、`frontend/workflow-domain.test.ts`、后端工作流用例 | 分块/CRLF/心跳/乱序/去重、格式失败、事件读取和校验后结果 |
 | 社区、草案与隐私 | `backend/test_v04.py`、`backend/test_workflow.py`、`frontend/campus.test.ts` | 私帖隔离、审核版本、编辑重审、草案来源归属、学校回声筛选 |

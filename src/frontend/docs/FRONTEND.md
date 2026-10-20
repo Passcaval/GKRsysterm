@@ -17,6 +17,7 @@ React 19 + TypeScript + Vite，保留现有依赖与锁文件，无额外状态�
 | src/pages/Identity.tsx | 个人页、申请注册、查询、注册审核 |
 | src/pages/RunRoutes.tsx | 任务恢复/补问/取消、校验后推荐与逐项反馈 |
 | src/pages/History.tsx / VerificationAdmin.tsx | 历史、记忆、独立共享授权；学校认证审核 |
+| src/pages/AdmissionsAdmin.tsx | 招生抓取配置摘要、触发、运行状态、逐页/逐行证据、原文下载、审核/驳回；仅 admissions:import 可见，Mock 明确不支持 |
 | src/AdmissionUnits.tsx | 正式招生单位/专业选择与同口径历史 |
 | scripts/contract.mjs | 唯一OpenAPI生成源，--check不修改文件 |
 
@@ -32,4 +33,4 @@ React 19 + TypeScript + Vite，保留现有依赖与锁文件，无额外状态�
 
 ## 实现边界
 
-具体F01–F12迁移见 [TECHNICAL-ALIGNMENT](TECHNICAL-ALIGNMENT.md)。本次前端提供可运行Mock和HTTP契约，未连接真实后端。官方采集、脱敏原件存储、权限审计、任务队列、LLM检索/校验、真实规则与概率校准均需后端实现。当前省份表单与Mock主要演示浙江三选科，不能冒充全国正式填报工具；志愿导出是草案，不是省考试院导入格式。
+具体F01–F12迁移见 [TECHNICAL-ALIGNMENT](TECHNICAL-ALIGNMENT.md)。前端提供可运行Mock和HTTP契约；HTTP 模式已连接真实 FastAPI、Worker 和 PostgreSQL。领航员普通问答已接入 OpenAI 兼容模型，只检索已发布的招生单位和用户画像，SSE 返回工具状态、证据和文本增量；聊天中明确提到与当前画像不同的省份/分数/位次/选科时，会显示待确认卡片，用户确认后才生成新的画像版本。画像保存后可通过“修改考生档案”再次编辑。向量检索、工具型 Agent、跨用户记忆尚未实现。考生画像将省份、年份、分数、位次和同意作为推荐必需项，选科/城市/专业/预算等可选；画像表单提供城市、专业和院校的模糊搜索建议，缺少可选信息时结果页展示三种策略分支及各自利弊，并提示补充画像。官方采集、权限审计、任务队列和自动抓取由后端实现；省份表单与Mock主要演示浙江三选科，不能冒充全国正式填报工具，志愿导出是草案，不是省考试院导入格式。

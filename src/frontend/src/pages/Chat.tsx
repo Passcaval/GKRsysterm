@@ -10,10 +10,11 @@ import {
 } from "lucide-react";
 import { api, isMock } from "../api";
 import { Evidence, Modal } from "../components";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, ProfileUpdateChange } from "../types";
 import { useApp } from "../store";
+import { errorText } from "../transport";
 export default function Chat({ onClose }: { onClose: () => void }) {
-  const { navigate } = useApp();
+  const { update, notify, navigate } = useApp();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,6 +24,13 @@ export default function Chat({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
   const [conversation, setConversation] = useState<string>();
   const [evidence, setEvidence] = useState<string[] | null>(null);
+  const [profileProposal, setProfileProposal] = useState<{
+    signalId: string;
+    changes: ProfileUpdateChange[];
+    expectedVersion: number;
+    question: string;
+  } | null>(null);
+  const [resolvingProfile, setResolvingProfile] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -45,6 +53,26 @@ export default function Chat({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     end.current?.scrollIntoView({ block: "nearest" });
   }, [messages]);
+  async function resolveProfile(decision: "confirm" | "reject") {
+    if (!profileProposal || resolvingProfile) return;
+    setResolvingProfile(true);
+    setError("");
+    try {
+      const result = await api.resolveProfileSignal(
+        profileProposal.signalId,
+        decision,
+        profileProposal.expectedVersion,
+      );
+      if (result.profile) update({ profile: result.profile });
+      notify(decision === "confirm" ? "考生画像已更新" : "已保留原画像");
+      setProfileProposal(null);
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setResolvingProfile(false);
+    }
+  }
+
   async function send() {
     const text = input.trim();
     if (!text || busy) return;
@@ -86,6 +114,18 @@ export default function Chat({ onClose }: { onClose: () => void }) {
               i === m.length - 1 ? { ...x, sourceIds: e.sourceIds || [] } : x,
             ),
           );
+        if (
+          e.type === "profile_update" &&
+          e.signalId &&
+          e.changes &&
+          e.expectedVersion !== undefined
+        )
+          setProfileProposal({
+            signalId: e.signalId,
+            changes: e.changes,
+            expectedVersion: e.expectedVersion,
+            question: e.question || "",
+          });
         if (e.type === "done") setConversation(e.conversationId);
       }
     } catch (e) {
@@ -205,6 +245,43 @@ export default function Chat({ onClose }: { onClose: () => void }) {
                 </button>
               </p>
             </div>
+          )}
+          {profileProposal && (
+            <section className="notice amber profile-update-card" role="alert">
+              <p>{profileProposal.question}</p>
+              <ul>
+                {profileProposal.changes.map((change) => (
+                  <li key={change.field}>
+                    {change.label}：
+                    {change.old === null || change.old === ""
+                      ? "未填写"
+                      : String(change.old)}{" "}
+                    → {String(change.new)}
+                  </li>
+                ))}
+              </ul>
+              <p className="muted">
+                确认后会生成新的考生画像版本，原版本仍保留在历史中。
+              </p>
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="button gold-button"
+                  disabled={resolvingProfile}
+                  onClick={() => void resolveProfile("confirm")}
+                >
+                  {resolvingProfile ? "处理中…" : "更新画像"}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  disabled={resolvingProfile}
+                  onClick={() => void resolveProfile("reject")}
+                >
+                  保持原样
+                </button>
+              </div>
+            </section>
           )}
           <div ref={end} />
         </div>

@@ -32,22 +32,31 @@ pnpm run dev
 - [后端实际接口、数据字典和前端差异](docs/contracts/BACKEND.md)
 - [生成的完整后端 OpenAPI](docs/contracts/backend-openapi.json)
 
-真实 PostgreSQL、并发事务、当前 v0.4 前端访问层及浏览器登录权限已联调；测试使用合成资料。注册申请、审批、画像和推荐工作流已有页面。未预装真实招生数据；模型、向量检索、学校认证审核、长期记忆和案例共享等 M2–M4 功能未完成，不能用演示模式的效果作为真实后端能力。
+真实 PostgreSQL、并发事务、当前 v0.4 前端访问层及浏览器登录权限已联调；测试使用合成资料。注册申请、审批、画像和推荐工作流已有页面。“夜航领航员”普通问答已接入 OpenAI 兼容模型（DeepSeek），会检索已发布招生数据并流式回答；但它不是正式推荐，不承诺录取。领航员在你提到与当前画像不同的省份、分数、位次或选科时，会先给出修改建议，只有你明确确认后才生成新的画像版本。考生画像以省份、分数、位次为推荐必需项，选科/城市/专业/预算等可选；缺少可选信息时仍会给出多种策略分支及各自利弊，并提示补充信息；画像表单支持城市、专业和院校的模糊搜索，保存后可随时修改。工具型 Agent、向量检索、学校认证审核、长期记忆和案例共享等 M2–M4 功能仍未完成，不能用演示模式的效果作为真实后端能力。
+
+## 招生数据自动抓取
+
+招生来源集中在 [`config/admission_sources.json`](config/admission_sources.json)，API 和 Worker 启动时读取同一份配置。`sources` 为空且 `discovery.enabled=true` 时，`crawl-worker` 启动后会自动抓取一次配置的官方入口并在允许域名内跟随链接；`sources` 非空时由管理员在 `/#/admin/admissions`（或 `POST /api/v1/admin/admissions/crawl`）触发。
+
+模型使用 OpenAI 兼容接口，密钥只放在 `deploy/.env`/`src/backend/.env`：
+
+```sh
+MODEL_BASE_URL=https://your-provider.example/v1
+MODEL_API_KEY=...
+MODEL_NAME=...
+```
+
+抓取/模型抽取结果先进入 `crawl_runs` 暂存区，保存原始快照、证据和模型版本；管理员必须在管理页或审核 API 批准后才会生成 `ImportBatch` 并由 Worker 发布。支持 HTML、PDF 和 XLS/XLSX 附件；真实站点常把 XLS 标成 `text/html`，后端按文件魔数识别，数千行的表格按表头确定性映射，模型负责选择链接而不是逐行猜测。未配置模型、源站不可达、robots 拒绝或字段不完整时自动抓取会失败/跳过，手工 JSON/CSV 导入仍然可用。当前只覆盖浙江 2026 普通类，不能把模型结果当作已核验的官方数据。
 
 ## Docker 一键部署
 
-如果需要一次启动前端、FastAPI、PostgreSQL 和后台 Worker，可在仓库根目录执行：
+在一台新机器上，启动 Docker Desktop 后只需执行：
 
 ```sh
-python deploy/manage.py up
+python deploy/manage.py init
 ```
 
-脚本会首次生成 `deploy/.env` 中的本地密钥，构建镜像，等待 PostgreSQL 健康检查并执行 Alembic 迁移。默认访问地址为 http://localhost:8080；本地配置使用 HTTP 和非 Secure Cookie，适合开发验证。创建首个管理员：
-
-```sh
-docker compose --env-file deploy/.env -f deploy/compose.prod.yaml exec api \
-  python -m app.cli create-admin --nickname 管理员 --email you@example.com
-```
+它会生成 `deploy/.env` 本地密钥，提示输入 DeepSeek 兼容接口地址、模型名、API key，以及首个管理员的昵称、邮箱和隐藏密码；随后构建镜像、启动前端/FastAPI/PostgreSQL/Worker、执行数据库迁移并创建管理员。模型参数会同步写入已存在的 `src/backend/.env`。默认访问地址为 http://localhost:8080。首次初始化后，日常启动使用 `python deploy/manage.py start`；代码变更后用 `python deploy/manage.py up` 重建并迁移。
 
 常用运维命令：
 

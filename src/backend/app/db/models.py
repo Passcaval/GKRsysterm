@@ -5,6 +5,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Sequence,
     String,
     Text,
@@ -267,3 +268,98 @@ class Feedback(Entity, Base):
 class Conversation(Entity, Base):
     __tablename__ = "conversations"
     owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+
+
+class ConversationMessage(Entity, Base):
+    __tablename__ = "conversation_messages"
+    conversation_id: Mapped[UUID] = mapped_column(ForeignKey("conversations.id"), index=True)
+    owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    role: Mapped[str] = mapped_column(String(16))
+    content: Mapped[str] = mapped_column(Text)
+    source_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    model_name: Mapped[str | None] = mapped_column(String(80))
+    __table_args__ = (
+        CheckConstraint("role IN ('user','assistant')"),
+        Index(
+            "ix_conversation_messages_conversation_created",
+            "conversation_id",
+            "created_at",
+        ),
+    )
+
+
+class ChatProfileSignal(Entity, Base):
+    """A chat-derived profile change awaiting explicit confirmation."""
+
+    __tablename__ = "chat_profile_signals"
+    owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    conversation_id: Mapped[UUID] = mapped_column(ForeignKey("conversations.id"), index=True)
+    message_id: Mapped[UUID] = mapped_column(ForeignKey("conversation_messages.id"), index=True)
+    changes: Mapped[list] = mapped_column(JSONB, default=list)
+    source_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    query_text: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16), default="proposed", index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint("status IN ('proposed','confirmed','rejected')"),
+        Index("ix_chat_profile_signals_owner_status", "owner_id", "status"),
+    )
+
+
+class CrawlRun(Entity, Base):
+    """A staged auto-crawl run. Nothing is published until an admin reviews it."""
+
+    __tablename__ = "crawl_runs"
+    trigger_type: Mapped[str] = mapped_column(String(16))
+    triggered_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(24), default="queued", index=True)
+    config_fingerprint: Mapped[str] = mapped_column(String(64))
+    config_snapshot: Mapped[dict] = mapped_column(JSONB)
+    model_name: Mapped[str | None] = mapped_column(String(80))
+    prompt_version: Mapped[str | None] = mapped_column(String(80))
+    progress: Mapped[dict] = mapped_column(JSONB, default=dict)
+    rows: Mapped[list] = mapped_column(JSONB, default=list)
+    pages_summary: Mapped[dict] = mapped_column(JSONB, default=dict)
+    warnings: Mapped[list] = mapped_column(JSONB, default=list)
+    errors: Mapped[list] = mapped_column(JSONB, default=list)
+    import_ids: Mapped[list] = mapped_column(JSONB, default=list)
+    review_payload: Mapped[dict | None] = mapped_column(JSONB)
+    version: Mapped[int] = mapped_column(default=1)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    review_reason: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        CheckConstraint("trigger_type IN ('startup','admin')"),
+        CheckConstraint(
+            "status IN ('queued','running','awaiting_review','approved','publishing',"
+            "'succeeded','partial','rejected','failed','cancelled')"
+        ),
+        Index("ix_crawl_runs_fingerprint_status", "config_fingerprint", "status"),
+        Index("ix_crawl_runs_created_at", "created_at"),
+    )
+
+
+class CrawlPage(Entity, Base):
+    __tablename__ = "crawl_pages"
+    crawl_run_id: Mapped[UUID] = mapped_column(ForeignKey("crawl_runs.id"))
+    url: Mapped[str] = mapped_column(String(2000))
+    depth: Mapped[int] = mapped_column(default=0)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    http_status: Mapped[int | None]
+    content_type: Mapped[str | None] = mapped_column(String(100))
+    content_hash: Mapped[str | None] = mapped_column(String(64))
+    storage_key: Mapped[str | None] = mapped_column(String(100))
+    title: Mapped[str | None] = mapped_column(String(300))
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    text_chars: Mapped[int] = mapped_column(default=0)
+    row_count: Mapped[int] = mapped_column(default=0)
+    rows: Mapped[list] = mapped_column(JSONB, default=list)
+    error: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        CheckConstraint("status IN ('pending','fetched','extracted','skipped','failed')"),
+        UniqueConstraint("crawl_run_id", "content_hash"),
+        Index("ix_crawl_pages_run_url", "crawl_run_id", "url"),
+    )

@@ -11,12 +11,16 @@ from app.core.config import Settings
 from app.core.contract import install_contract
 from app.core.errors import error_response, install_handlers, result
 from app.db.session import configure_db
+from app.modules.admissions.config import load_admission_config
+from app.modules.admissions.crawl_router import router as admissions_crawl
 from app.modules.admissions.router import router as admissions
 from app.modules.agent.router import router as agent
+from app.modules.agent.signals_router import router as chat_profile_signals
 from app.modules.community.content import router as content
 from app.modules.community.router import router as accounts
 from app.modules.history.router import router as history
 from app.modules.profiles.router import router as profiles
+from app.modules.profiles.suggestions import router as profile_suggestions
 from app.modules.recommendation.router import router as recommendations
 
 
@@ -74,6 +78,7 @@ def create_app(settings: Settings | None = None, *, contract_version="0.4"):
     app = FastAPI(title="Night Voyage M0–M1", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.contract_version = contract_version
+    app.state.admission_config, app.state.admission_config_error = load_admission_config(settings)
     configure_db(app, settings)
     app.add_middleware(BodyLimit)
     app.add_middleware(
@@ -139,5 +144,8 @@ def create_app(settings: Settings | None = None, *, contract_version="0.4"):
         for route in history.routes:
             if route.path == "/api/v1/admin/feedback":
                 app.router.routes.append(route)
+        app.include_router(admissions_crawl)
+        app.include_router(profile_suggestions)
+        app.include_router(chat_profile_signals)
         install_contract(app)
     return app

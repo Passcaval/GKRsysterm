@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "province_code": "浙江",
+  "exam_year": 2026,
+  "exam_category": "普通类",
+  "sources": [],
+  "discovery": {
+    "enabled": true,
+    "auto_start": true,
+    "entrypoints": ["https://www.zjzs.net/col/col27/index.html"],
+    "allowed_hosts": ["www.zjzs.net", "zjzs.net"],
+    "allowed_suffixes": [".gov.cn", ".edu.cn"],
+    "max_depth": 3,
+    "max_pages": 30,
+    "max_links_per_page": 60,
+    "keywords": ["招生计划", "招生章程", "普通类", "2026", "投档", "分数线", "专业", "计划", "招生", "录取", "志愿", "选考", "普通高考", "高考", "招生考试"]
+  },
+  "crawl": {
+    "max_bytes_per_page": 5242880,
+    "timeout_seconds": 20,
+    "max_redirects": 5,
+    "min_interval_seconds": 1.0,
+    "max_wall_seconds": 900,
+    "max_model_calls": 80,
+    "max_chars_per_call": 12000,
+    "max_rows_per_call": 50,
+    "user_agent": "NightVoyageAdmissionsBot/1.0",
+    "respect_robots": true,
+    "allow_private_hosts_for_tests": false
+  },
+  "model": {
+    "provider": "openai-compatible",
+    "json_mode": true,
+    "prompt_version": "admissions-extract-v1",
+    "temperature": 0,
+    "max_output_tokens": 4000
+  },
+  "publish": {
+    "require_review": true
+  }
+}

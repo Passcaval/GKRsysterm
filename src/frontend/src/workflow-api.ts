@@ -19,12 +19,19 @@ import type {
   Page,
   AdmissionUnit,
   Verification,
+  AdmissionSourceSummary,
+  CrawlRun,
+  CrawlRunSummary,
+  CrawlReviewInput,
+  ProfileSuggestions,
+  ProfileSignalResult,
 } from "./types";
 import { hasPermission } from "./types";
 import { classify, validateProfile } from "./domain";
 import {
   missingForIntent,
   terminalRuns,
+  validateCrawlRun,
   validateRegistration,
   validateRun,
   validEmail,
@@ -282,6 +289,84 @@ export function createWorkflowApi(ctx: Context) {
     state.versions[u.id].push(next);
     write(state);
     return structuredClone(next);
+  }
+  async function resolveProfileSignal(
+    signalId: string,
+    decision: "confirm" | "reject",
+    expectedVersion: number,
+  ): Promise<ProfileSignalResult> {
+    if (isMock)
+      throw new ApiError(
+        503,
+        "演示模式不支持画像校准",
+        undefined,
+        "FEATURE_NOT_AVAILABLE",
+      );
+    const result = await request<any>(
+      "/chat/profile-signals/" + encodeURIComponent(signalId) + "/resolve",
+      "POST",
+      { decision, expected_version: expectedVersion },
+      { raw: true },
+    );
+    const signal = result.signal || {};
+    return {
+      signal: {
+        signalId: signal.signal_id || signal.signalId,
+        status: signal.status,
+        changes: signal.changes || [],
+        sourceIds: signal.source_ids || signal.sourceIds || [],
+        question: signal.question || "",
+        queryText: signal.query_text || signal.queryText,
+      },
+      profile: result.profile ? profileFromWire(result.profile) : null,
+    };
+  }
+  async function suggestProfile(query: string): Promise<ProfileSuggestions> {
+    if (!isMock)
+      return request(
+        "/me/profile/suggestions?q=" + encodeURIComponent(query.trim()),
+      );
+    const text = query.trim().toLowerCase();
+    const score = (value: string) => {
+      const lower = value.toLowerCase();
+      if (!text) return 0;
+      if (lower.includes(text)) return 1000 - lower.indexOf(text);
+      let cursor = 0;
+      let matched = 0;
+      for (const char of text) {
+        const found = lower.indexOf(char, cursor);
+        if (found < 0) break;
+        cursor = found + 1;
+        matched += 1;
+      }
+      if (matched === text.length) return 500 - Math.min(400, lower.length - text.length);
+      const common = [...new Set(text)].filter((char) => lower.includes(char)).length;
+      return common ? Math.round((600 * common) / new Set(text).size) : 0;
+    };
+    const top = (values: string[], limit = 8) =>
+      [...new Set(values)]
+        .filter((value) => value && value !== "待核对")
+        .map((value) => [score(value), value] as const)
+        .sort((a, b) => b[0] - a[0] || a[1].localeCompare(b[1]))
+        .filter(([value]) => value >= 150)
+        .slice(0, limit)
+        .map(([, value]) => value);
+    const schools = ctx.db().schools;
+    return {
+      cities: top(schools.map((school) => school.city)),
+      majors: top(schools.flatMap((school) => school.majors)),
+      schools: schools
+        .map((school) => ({
+          id: school.id,
+          name: school.name,
+          city: school.city,
+          score: score(school.name + " " + school.city + " " + school.majors.join(" ")),
+        }))
+        .filter((school) => school.score >= 150)
+        .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+        .slice(0, 5)
+        .map(({ score: _, ...school }) => school),
+    };
   }
   function generateItems(run: MockRun): RecommendationItem[] {
     const d = ctx.db(),
@@ -739,6 +824,8 @@ export function createWorkflowApi(ctx: Context) {
       );
     },
     profile: saveProfile,
+    profileSuggestions: suggestProfile,
+    resolveProfileSignal,
     async profileVersions(): Promise<Profile[]> {
       if (!isMock)
         return (
@@ -853,9 +940,10 @@ export function createWorkflowApi(ctx: Context) {
               {
                 province_code: "请填写生源省份",
                 exam_year: "请填写报考年份",
-                subjects: "请填写选科，用逗号分隔",
+                score: "请填写高考分数",
+                subjects: "请填写选科，用逗号分隔（可选）",
                 rank: "请填写省内位次",
-                rank_cohort: "请填写位次口径（如：浙江普通类）",
+                rank_cohort: "请填写位次口径（可选）",
                 consent: "是否同意本次使用画像信息？",
               }[field] || field,
             required: true,
@@ -937,6 +1025,7 @@ export function createWorkflowApi(ctx: Context) {
           if (answers.province_code !== undefined)
             p.province = answers.province_code;
           if (answers.exam_year) p.year = Number(answers.exam_year);
+          if (answers.score) p.score = Number(answers.score);
           if (answers.rank) p.rank = Number(answers.rank);
           if (answers.rank_cohort) p.rankCohort = answers.rank_cohort;
           if (answers.subjects)
@@ -1508,6 +1597,97 @@ export function createWorkflowApi(ctx: Context) {
       s.sharing[u.id] = enabled;
       write(s);
       return { enabled };
+    },
+    async admissionSources(): Promise<AdmissionSourceSummary> {
+      if (isMock)
+        throw new ApiError(
+          503,
+          "演示模式不支持真实招生抓取",
+          undefined,
+          "FEATURE_NOT_AVAILABLE",
+        );
+      return request("/admin/admission-sources");
+    },
+    async crawlRuns(cursor: string | null = null): Promise<Page<CrawlRunSummary>> {
+      if (isMock)
+        throw new ApiError(
+          503,
+          "演示模式不支持真实招生抓取",
+          undefined,
+          "FEATURE_NOT_AVAILABLE",
+        );
+      return request(
+        "/admin/admissions/crawl" +
+          (cursor ? "?cursor=" + encodeURIComponent(cursor) : ""),
+      );
+    },
+    async triggerCrawl(key: string): Promise<CrawlRunSummary> {
+      if (isMock)
+        throw new ApiError(
+          503,
+          "演示模式不支持真实招生抓取",
+          undefined,
+          "FEATURE_NOT_AVAILABLE",
+        );
+      return request("/admin/admissions/crawl", "POST", {}, { key });
+    },
+    async crawlRun(
+      id: string,
+      offset = 0,
+      limit = 200,
+    ): Promise<CrawlRun> {
+      if (isMock)
+        throw new ApiError(
+          503,
+          "演示模式不支持真实招生抓取",
+          undefined,
+          "FEATURE_NOT_AVAILABLE",
+        );
+      return validateCrawlRun(
+        await request(
+          "/admin/admissions/crawl/" +
+            encodeURIComponent(id) +
+            `?row_offset=${offset}&row_limit=${limit}`,
+        ),
+      );
+    },
+    async crawlPageRaw(id: string, pageId: string): Promise<Blob> {
+      if (isMock)
+        throw new ApiError(
+          503,
+          "演示模式不支持真实招生抓取",
+          undefined,
+          "FEATURE_NOT_AVAILABLE",
+        );
+      return protectedBlob(
+        "/admin/admissions/crawl/" +
+          encodeURIComponent(id) +
+          "/pages/" +
+          encodeURIComponent(pageId) +
+          "/raw",
+      );
+    },
+    async reviewCrawl(
+      id: string,
+      input: CrawlReviewInput,
+      key: string,
+    ): Promise<CrawlRun> {
+      if (isMock)
+        throw new ApiError(
+          503,
+          "演示模式不支持真实招生抓取",
+          undefined,
+          "FEATURE_NOT_AVAILABLE",
+        );
+      await request(
+        "/admin/admissions/crawl/" + encodeURIComponent(id) + "/review",
+        "POST",
+        input,
+        { key },
+      );
+      return validateCrawlRun(
+        await request("/admin/admissions/crawl/" + encodeURIComponent(id)),
+      );
     },
   };
 }

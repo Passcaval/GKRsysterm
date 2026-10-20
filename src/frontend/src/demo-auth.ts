@@ -55,7 +55,12 @@ export function authenticateDemo(input: LoginInput): User | null {
         emailVerified: false,
         permissions:
           account.user.role === "admin"
-            ? ["registration:review", "verification:review", "content:review"]
+            ? [
+                "registration:review",
+                "verification:review",
+                "content:review",
+                "admissions:import",
+              ]
             : account.user.role === "reviewer"
               ? ["content:review"]
               : [],

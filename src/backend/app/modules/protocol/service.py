@@ -175,25 +175,50 @@ def internal_profile(raw, existing=None):
         ) from None
 
 
-def questions(snapshot):
+def required_questions(snapshot):
+    """Fields that block a personalised recommendation.
+
+    Province, exam year, score, rank and consent are required. Subjects,
+    cities, majors, budget, cohort and batch are optional and are surfaced by
+    ``optional_questions`` instead of blocking the run.
+    """
     p = snapshot.get("profile") or {}
+    if snapshot.get("intent", "risk") == "campus_life":
+        return []
     missing_fields = []
     if not p.get("province"):
-        missing_fields.append(("province_code", "请填写省份，例如浙江"))
-    if len(p.get("subjects", [])) != 3:
-        missing_fields.append(("subjects", "请填写三门选科，以逗号分隔"))
+        missing_fields.append(("province_code", "请填写生源省份，例如浙江"))
+    if not p.get("year"):
+        missing_fields.append(("exam_year", "请填写报考年份"))
+    if p.get("score") is None:
+        missing_fields.append(("score", "请填写高考分数"))
+    if p.get("rank") is None:
+        missing_fields.append(("rank", "请填写省内位次"))
     if not p.get("consent"):
         missing_fields.append(("consent", "是否同意将画像用于本次推荐？填写 true"))
-    if snapshot.get("intent", "risk") == "risk":
-        if not p.get("rank"):
-            missing_fields.append(("rank", "请填写省内位次"))
-        if not p.get("rank_cohort"):
-            missing_fields.append(("rank_cohort", "请填写位次统计口径"))
-    if p.get("budget") is None:
-        missing_fields.append(("budget", "请填写每年学费预算金额"))
-    if not p.get("batch"):
-        missing_fields.append(("batch", "请确认报考批次名称，与官方资料一致"))
     return [{"field": field, "text": text, "required": True} for field, text in missing_fields]
+
+
+def optional_questions(snapshot):
+    p = snapshot.get("profile") or {}
+    missing_fields = []
+    if len(p.get("subjects") or []) != 3:
+        missing_fields.append(("subjects", "补充三门选科后，可判断专业选科硬条件"))
+    if not p.get("cities"):
+        missing_fields.append(("cities", "补充城市偏好后，可按地域比较院校"))
+    if not p.get("interests"):
+        missing_fields.append(("interests", "补充专业兴趣后，可优先展示匹配方向"))
+    if p.get("budget") is None:
+        missing_fields.append(("budget", "补充学费预算后，可排除超预算选项"))
+    if not p.get("rank_cohort"):
+        missing_fields.append(("rank_cohort", "补充位次口径后，可使用同口径历史参考"))
+    if not p.get("batch"):
+        missing_fields.append(("batch", "确认报考批次后，可校验招生单位批次"))
+    return [{"field": field, "text": text, "required": False} for field, text in missing_fields]
+
+
+def questions(snapshot):
+    return required_questions(snapshot)
 
 
 def run_view(run):
@@ -222,6 +247,8 @@ def run_view(run):
         "created_at": run.created_at.isoformat(),
         "questions": questions(run.snapshot) if run.status == "waiting_input" else [],
         "items": items,
+        "branches": deepcopy(output.get("branches", [])),
+        "missing_info": optional_questions(run.snapshot),
         "validation": {
             "status": "passed"
             if output.get("validation", {}).get("status") == "pass"

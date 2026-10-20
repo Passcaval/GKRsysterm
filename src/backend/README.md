@@ -47,6 +47,29 @@ pnpm run dev
 
 改用其他前端端口时同步 `.env` 的 ALLOWED_ORIGINS，并重启 API。浏览器与 API 应使用同一主机名；开发阶段优先通过 Vite 代理。当前前端开发默认 Mock，生产构建默认 HTTP；建议部署时显式设置 `VITE_API_MODE=http`。standalone 始终为演示模式。线上同源反向代理 `/api`、启用 HTTPS 与 `COOKIE_SECURE=true`、`APP_ENV=production`，SSE 关闭代理缓冲。
 
+## 招生数据自动抓取
+
+来源与抓取策略来自仓库根目录 `config/admission_sources.json`，API/Worker 启动时读取；修改后重启对应进程。手工导入仍是兜底。
+
+- 自动触发：`sources` 为空、`discovery.auto_start=true`、模型已配置、数据库无 active 招生单位且没有同配置指纹的抓取运行时，Worker 启动后创建一次 `crawl` 任务。
+- 手动触发：`POST /api/v1/admin/admissions/crawl`（需管理员会话与 Idempotency-Key），或 `python -m app.cli crawl`。
+- 模型环境变量：`MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME`；可选 `MODEL_TIMEOUT_SECONDS`、`MODEL_MAX_OUTPUT_TOKENS`。`MODEL_BASE_URL` 应包含供应商要求的 API 前缀（例如 `https://api.deepseek.com/v1`），网关会追加 `/chat/completions`。密钥只从环境变量读取。
+- Worker 任务类型：默认 worker 处理 `import,recommendation`，Compose 另起 `crawl-worker` 处理 `crawl`；也可用 `python -m app.workers.runner --task-types crawl` 单跑。`--once` 不自动入队。
+- 审核：管理页 `/#/admin/admissions` 或 `GET/POST /api/v1/admin/admissions/crawl*`。抽查原始快照、逐行证据和字段校验，批准后才生成 `ImportBatch` 并发布；`reject` 不发布。页面无官方发布时间时需显式确认使用抓取时间；已有同校同单位数据时需提供 `supersedes_import_id`。
+- 限制：支持静态 HTML、PDF 和 XLS/XLSX（按表头映射）；不执行 JS、不做 OCR；仅浙江 2026 普通类；表格缺 school_code/unit_code 等关键列的行会标为无效，缺城市/省份/简称时用“待核对”或派生值并告警，学费/选科未知保持 null。缺必填字段的行需要 `rows_override` 补齐或手工导入。抓取测试全部使用本地 HTTP fixture，不访问真实官网。
+
+## AI 领航员聊天
+
+`POST /api/v1/chat/stream` 已接入 OpenAI 兼容的流式模型（与招生抓取共用 `MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME`）。它只检索已发布、已审核的 `admission_units`，把用户最新画像和最近 8 条会话消息放入上下文，以 SSE 返回 `tool_start`、`tool_end`、`evidence`、`delta`、`done`/`error` 事件。会话消息保存在 `conversation_messages` 表；未配置模型时返回 503，不伪造回答。
+
+聊天回答不是正式推荐，不计算录取概率；个性化冲稳保仍需使用画像和推荐任务。当前没有向量检索、网页工具或跨用户记忆。提示词明确要求不编造院校代码、专业代码、分数、位次、学费和选科要求，并要求在检索数据与用户分数差距明显时说明该批次不适合。
+
+聊天还会从明确语句中识别与当前画像不同的省份、分数、位次和完整三门选科，写入 `chat_profile_signals` 并通过 SSE `profile_update` 请求确认。只有用户确认后才调用 `POST /api/v1/chat/profile-signals/{id}/resolve` 创建新的画像版本；信号保留检索来源 ID，作为搜索反馈审计。画像保存后可通过 `PATCH /me/profile` 继续修改，前端 `/#/profile` 和“我的夜航”页均提供入口。
+
+## 考生画像与分支推荐
+
+画像推荐把省份、报考年份、分数、位次和同意作为必需项；选科、城市、专业兴趣、预算、位次口径和批次可选。缺少可选字段时仍会生成结果，但相关硬条件进入“待确认”，并返回 `missing_info` 和三种策略分支（专业优先、地域优先、成本优先）的利弊；分支只重排同一次已校验候选，不产生新的录取结论。`GET /api/v1/me/profile/suggestions?q=` 提供城市/专业/院校的模糊输入建议，数据只来自已发布招生单位与院校元数据。
+
 ## 自动验证
 
 测试只允许以 `_test` 结尾的 PostgreSQL 数据库，会清空其中本项目的表。第一次先创建独立库（已存在时不重复执行）：

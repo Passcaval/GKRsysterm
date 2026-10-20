@@ -37,7 +37,7 @@ def create_profile(client):
         "province_code": "浙江",
         "exam_year": 2026,
         "exam_category": "普通类",
-        "score": None,
+        "score": 628,
         "rank": None,
         "rank_cohort": None,
         "subjects": ["物理", "化学", "生物"],
@@ -147,10 +147,10 @@ def test_v04_profile_answers_worker_feedback_plan_and_events(modern, student, pu
     profile = create_profile(modern)
     run = create_run(modern, profile)
     assert run["status"] == "waiting_input"
-    assert {q["field"] for q in run["questions"]} == {"rank", "rank_cohort", "batch"}
+    assert {q["field"] for q in run["questions"]} == {"rank"}
     payload = {
         "expected_version": run["version"],
-        "answers": {"rank": "20000", "rank_cohort": "浙江普通类", "batch": "普通类一段"},
+        "answers": {"rank": "20000", "batch": "普通类一段"},
     }
     url = "/api/v1/recommendations/" + run["run_id"]
     answered = modern.post(url + "/answers", json=payload, headers={"Idempotency-Key": "v4-answer"})

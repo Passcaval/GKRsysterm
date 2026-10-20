@@ -125,7 +125,11 @@ def throttle(request: Request, kind: str):
     address = request.client.host if request.client else "unknown"
     window = int(now().timestamp()) // 60
     key = digest(f"{kind}:{address}:{window}")
-    limit = settings.registration_rate_limit if kind == "registration" else settings.auth_rate_limit
+    limit = {
+        "registration": settings.registration_rate_limit,
+        "crawl": settings.crawl_rate_limit,
+        "chat": settings.chat_rate_limit,
+    }.get(kind, settings.auth_rate_limit)
     with request.app.state.sessions.begin() as db:
         count = db.scalar(
             insert(RateBucket)

@@ -13,6 +13,18 @@ from app.core.security import advisory_lock
 from app.db.models import AdmissionUnit, ImportBatch, Job, School, Source
 from app.modules.community.schemas import StrictModel
 
+VOLATILE_IMPORT_FIELDS = {
+    "crawl_run_id",
+    "crawl_page_id",
+    "config_fingerprint",
+    "raw_content_hash",
+    "model_name",
+    "prompt_version",
+    "confidence",
+    "published_at_source",
+    "retrieved_at",
+}
+
 
 class HistoryRow(StrictModel):
     year: int = Field(ge=2000, le=2035)
@@ -66,30 +78,55 @@ class ImportInput(StrictModel):
     rows: list[AdmissionRow] = Field(min_length=1, max_length=1000)
     supersedes_import_id: UUID | None = None
 
+    # Optional provenance for crawler-origin batches; manual imports leave these empty.
+    origin: Literal["manual", "crawl"] = "manual"
+    crawl_run_id: UUID | None = None
+    crawl_page_id: UUID | None = None
+    config_fingerprint: str | None = Field(default=None, max_length=64)
+    raw_content_hash: str | None = Field(default=None, max_length=64)
+    model_name: str | None = Field(default=None, max_length=80)
+    prompt_version: str | None = Field(default=None, max_length=80)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    published_at_source: Literal["official", "retrieved"] | None = None
+    retrieved_at: datetime | None = None
+
     @model_validator(mode="after")
     def timezone_required(self):
         if self.published_at.utcoffset() is None:
             raise ValueError("Publication time requires a timezone")
+        if self.retrieved_at is not None and self.retrieved_at.utcoffset() is None:
+            raise ValueError("Retrieval time requires a timezone")
         return self
 
 
-def enqueue_import(db, settings, actor, payload):
-    url = urlparse(payload.source_url)
-    host = (url.hostname or "").lower()
-    if (
-        url.scheme != "https"
-        or url.username
-        or url.password
-        or not (
-            host in settings.source_hosts or host.endswith(".edu.cn") or host.endswith(".gov.cn")
-        )
-    ):
-        raise DomainError(
-            422, "SOURCE_INVALID", "须提供允许的官方 HTTPS 来源；不会自动抓取该 URL。"
-        )
+def enqueue_import(db, settings, actor, payload, admission_config=None):
+    if admission_config is not None:
+        try:
+            admission_config.require_allowed_url(payload.source_url)
+        except ValueError as exc:
+            raise DomainError(422, "SOURCE_INVALID", f"来源不在允许列表：{exc}") from None
+    else:
+        url = urlparse(payload.source_url)
+        host = (url.hostname or "").lower()
+        if (
+            url.scheme != "https"
+            or url.username
+            or url.password
+            or not (
+                host in settings.source_hosts
+                or host.endswith(".edu.cn")
+                or host.endswith(".gov.cn")
+            )
+        ):
+            raise DomainError(
+                422, "SOURCE_INVALID", "须提供允许的官方 HTTPS 来源；不会自动抓取该 URL。"
+            )
     data = payload.model_dump(mode="json")
+    # Crawl metadata is provenance, not identity: identical rows from a new run
+    # must reuse the existing ImportBatch instead of creating a duplicate.
+    canonical = payload.model_dump(mode="json", exclude=VOLATILE_IMPORT_FIELDS)
     content_hash = hashlib.sha256(
-        json.dumps(data, sort_keys=True, ensure_ascii=False).encode()
+        json.dumps(canonical, sort_keys=True, ensure_ascii=False).encode()
     ).hexdigest()
     advisory_lock(db, "import:" + content_hash)
     previous = db.scalar(select(ImportBatch).where(ImportBatch.fingerprint == content_hash))
@@ -111,19 +148,34 @@ def process_import(db, batch):
     advisory_lock(db, "admissions:publish")
     source = db.scalar(select(Source).where(Source.content_hash == batch.fingerprint))
     if not source:
-        source = Source(
-            content_hash=batch.fingerprint,
-            data={
-                "kind": "official",
-                "title": payload.source_title,
-                "url": payload.source_url,
-                "year": 2026,
-                "retrievedAt": batch.created_at.isoformat(),
-                "excerpt": f"人工复核导入；位置：{payload.locator}",
-                "published_at": payload.published_at.isoformat(),
-                "locator": payload.locator,
-            },
-        )
+        origin_text = "自动抓取、管理员审核后发布" if payload.origin == "crawl" else "人工复核导入"
+        source_data = {
+            "kind": "official",
+            "title": payload.source_title,
+            "url": payload.source_url,
+            "year": payload.rows[0].exam_year,
+            "retrievedAt": (payload.retrieved_at or batch.created_at).isoformat(),
+            "excerpt": f"{origin_text}；位置：{payload.locator}",
+            "published_at": payload.published_at.isoformat(),
+            "published_at_source": payload.published_at_source or "official",
+            "locator": payload.locator,
+            "origin": payload.origin,
+        }
+        for key in (
+            "config_fingerprint",
+            "raw_content_hash",
+            "model_name",
+            "prompt_version",
+            "confidence",
+        ):
+            value = getattr(payload, key)
+            if value is not None:
+                source_data[key] = value
+        for key in ("crawl_run_id", "crawl_page_id"):
+            value = getattr(payload, key)
+            if value is not None:
+                source_data[key] = str(value)
+        source = Source(content_hash=batch.fingerprint, data=source_data)
         db.add(source)
         db.flush()
     for row in payload.rows:
@@ -174,11 +226,14 @@ def active_units(db):
     return list(db.scalars(select(AdmissionUnit).where(AdmissionUnit.active.is_(True))))
 
 
-def school_views(db):
-    units = active_units(db)
+def school_views(db, units=None):
+    units = active_units(db) if units is None else units
+    grouped: dict = {}
+    for unit in units:
+        grouped.setdefault(unit.school_id, []).append(unit)
     views = []
     for school in db.scalars(select(School).order_by(School.code)):
-        group = [u for u in units if u.school_id == school.id]
+        group = grouped.get(school.id, [])
         # A legacy School requires rank and tuition numbers. Do not fabricate zeroes.
         complete = [
             u

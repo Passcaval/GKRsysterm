@@ -43,7 +43,13 @@ def import_snapshot(import_id: UUID, request: Request, actor=Depends(admin), db=
 
 @router.post("/admin/imports", status_code=202)
 def import_json(data: ImportInput, request: Request, actor=Depends(admin), db=Depends(get_db)):
-    batch = enqueue_import(db, request.app.state.settings, actor, data)
+    batch = enqueue_import(
+        db,
+        request.app.state.settings,
+        actor,
+        data,
+        getattr(request.app.state, "admission_config", None),
+    )
     db.commit()
     return result(request, {"import_id": str(batch.id), "status": batch.status})
 
@@ -79,7 +85,13 @@ async def import_csv(request: Request, actor=Depends(admin), db=Depends(get_db))
             raise DomainError(
                 422, "IMPORT_INVALID", "CSV 内容或 JSON 列格式错误，请检查行与字段。"
             ) from None
-    batch = enqueue_import(db, request.app.state.settings, actor, data)
+    batch = enqueue_import(
+        db,
+        request.app.state.settings,
+        actor,
+        data,
+        getattr(request.app.state, "admission_config", None),
+    )
     db.commit()
     return result(request, {"import_id": str(batch.id), "status": batch.status})
 

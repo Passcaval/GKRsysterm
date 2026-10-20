@@ -1,4 +1,5 @@
 import type {
+  CrawlRun,
   Profile,
   RecommendationRun,
   RegistrationInput,
@@ -71,12 +72,11 @@ export function missingForIntent(profile: Profile | null, intent: string) {
   const missing: string[] = [];
   if (!profile?.province) missing.push("province_code");
   if (!profile?.year) missing.push("exam_year");
-  if (profile?.subjects?.length !== 3) missing.push("subjects");
+  if (profile?.score === null || profile?.score === undefined)
+    missing.push("score");
+  if (profile?.rank === null || profile?.rank === undefined)
+    missing.push("rank");
   if (!profile?.consent) missing.push("consent");
-  if (intent === "risk") {
-    if (!profile?.rank) missing.push("rank");
-    if (!profile?.rankCohort) missing.push("rank_cohort");
-  }
   return missing;
 }
 export function validateRun(raw: unknown): RecommendationRun {
@@ -122,4 +122,18 @@ export function visibleRunItems(run: RecommendationRun | null) {
     ["succeeded", "partial"].includes(run.status)
     ? run.items.filter((i) => i.eligibility.status !== "fail")
     : [];
+}
+
+export function validateCrawlRun(raw: unknown): CrawlRun {
+  const run = raw as CrawlRun;
+  if (
+    !run ||
+    typeof run.crawlRunId !== "string" ||
+    typeof run.status !== "string" ||
+    !Array.isArray(run.pages) ||
+    !Array.isArray(run.rows) ||
+    !Array.isArray(run.imports)
+  )
+    throw new Error("抓取任务响应格式不符合契约");
+  return run;
 }

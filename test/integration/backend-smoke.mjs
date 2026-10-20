@@ -92,7 +92,7 @@ try {
     province: "浙江",
     year: 2026,
     score: 600,
-    rank: 20000,
+    rank: null,
     subjects: ["物理", "化学", "生物"],
     cities: ["测试市"],
     interests: ["计算机"],
@@ -113,7 +113,7 @@ try {
   assert.equal(run.status, "waiting_input");
   run = await api.answerRun(
     run.runId,
-    { batch: "普通类一段" },
+    { rank: "20000", batch: "普通类一段" },
     run.version,
     "live-answer",
   );
