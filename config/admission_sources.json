@@ -6,7 +6,7 @@
   "sources": [],
   "discovery": {
     "enabled": true,
-    "auto_start": true,
+    "auto_start": false,
     "entrypoints": ["https://www.zjzs.net/col/col27/index.html"],
     "allowed_hosts": ["www.zjzs.net", "zjzs.net"],
     "allowed_suffixes": [".gov.cn", ".edu.cn"],

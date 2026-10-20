@@ -1,4 +1,50 @@
 export type Tier = "reach" | "match" | "safe" | "unknown";
+export interface CatalogChange {
+  identifier: string;
+  name: string;
+  kind: "new" | "changed" | "unchanged" | "conflict";
+  before: Record<string, string | null>;
+  after: Record<string, string>;
+}
+export interface CatalogSummary {
+  id: string;
+  status: string;
+  version: number;
+  createdAt: string;
+  counts: Record<CatalogChange["kind"], number>;
+  officialCounts: { ordinary: number; adult: number; total: number } | null;
+  error: string | null;
+  review: { reason?: string; publishedCount?: number };
+}
+export interface CatalogRun extends CatalogSummary {
+  changes: CatalogChange[];
+  total: number;
+  nextOffset: number | null;
+  snapshot: {
+    asOf?: string | null;
+    publicationUrl?: string;
+    scopeNote?: string;
+    snapshots?: { url: string; label: string; contentHash: string }[];
+  };
+  analysis: {
+    rowsAnalyzed?: number;
+    modelName?: string;
+    batches?: {
+      offset: number;
+      count: number;
+      summary: string;
+      warnings: string[];
+    }[];
+  };
+}
+export interface CatalogConfigSummary {
+  enabled: boolean;
+  autoStart: boolean;
+  modelConfigured: boolean;
+  modelName: string | null;
+  publicationUrl: string;
+  scope: string;
+}
 export type Signal = "strong" | "medium" | "weak" | "disputed";
 export interface User {
   id: string;

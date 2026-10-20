@@ -28,6 +28,9 @@ class Settings(BaseSettings):
             Path(__file__).resolve().parents[4] / "config" / "admission_sources.json"
         )
     )
+    school_catalog_file: Path = Field(
+        default_factory=lambda: Path(__file__).resolve().parents[4] / "config/school_catalog.json"
+    )
 
     # OpenAI-compatible model gateway. Empty strings are normalised to None.
     model_base_url: str | None = None

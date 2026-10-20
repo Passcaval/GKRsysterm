@@ -23,5 +23,8 @@
 | 数据库结构 | 统一入口调用 `src/backend/scripts/check_migrations.py` | 独立测试库 upgrade→downgrade→upgrade、模型与迁移一致性 |
 | 防止误用开发库 | `backend/test_database_guard.py` | 非 `_test` PostgreSQL 和 SQLite 均在连接/迁移前拒绝，返回非零退出码 |
 | 未开放功能 | `backend/test_v04.py` | M2/M3入口明确失败、案例共享保持关闭、不虚构成功 |
+| 全国院校基础名录 | `backend/test_catalog.py`、`frontend/catalog.test.ts` | 普通/成人完整附件、3196所解析与模拟AI全量分析/真实数据库发布、部署启动去重、HTTPS官方镜像、差异/分页、部分批准/拒绝、模型缺失/连续重试、并发版本保护、私有原件和强类型OpenAPI |
+
+`verify_catalog_source.py`是显式运行的只读真实官网验证，不纳入CI，不调用AI或更新数据库；结果和原件写入忽略的reports目录。实际来源截至日期与测试记录见docs/contracts/CATALOG.md。全国基础名录不表示全部分省招生资料已覆盖。
 
 尚未覆盖：真实招生资料准确性与招生政策人工复核；正式投档结果；模型质量与向量检索；学校认证审核、长期记忆与案例共享业务；全部页面的自动浏览器操作、手机和多浏览器、麦克风实录；生产HTTPS/反向代理SSE、弱网/负载/安全渗透、备份恢复和完整可访问性。以上未实现或未验收项不能因本套测试通过而标记完成。

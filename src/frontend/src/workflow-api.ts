@@ -25,6 +25,9 @@ import type {
   CrawlReviewInput,
   ProfileSuggestions,
   ProfileSignalResult,
+  CatalogConfigSummary,
+  CatalogSummary,
+  CatalogRun,
 } from "./types";
 import { hasPermission } from "./types";
 import { classify, validateProfile } from "./domain";
@@ -135,6 +138,15 @@ function page<T>(items: T[], cursor: string | null = null): Page<T> {
   };
 }
 export function createWorkflowApi(ctx: Context) {
+  function catalogHttp() {
+    if (isMock)
+      throw new ApiError(
+        503,
+        "演示模式不连接全国院校名录同步服务",
+        undefined,
+        "FEATURE_NOT_AVAILABLE",
+      );
+  }
   const user = () => ctx.requireUser(ctx.db());
   const permission = (name: string) => {
     const u = user();
@@ -339,8 +351,11 @@ export function createWorkflowApi(ctx: Context) {
         cursor = found + 1;
         matched += 1;
       }
-      if (matched === text.length) return 500 - Math.min(400, lower.length - text.length);
-      const common = [...new Set(text)].filter((char) => lower.includes(char)).length;
+      if (matched === text.length)
+        return 500 - Math.min(400, lower.length - text.length);
+      const common = [...new Set(text)].filter((char) =>
+        lower.includes(char),
+      ).length;
       return common ? Math.round((600 * common) / new Set(text).size) : 0;
     };
     const top = (values: string[], limit = 8) =>
@@ -360,7 +375,9 @@ export function createWorkflowApi(ctx: Context) {
           id: school.id,
           name: school.name,
           city: school.city,
-          score: score(school.name + " " + school.city + " " + school.majors.join(" ")),
+          score: score(
+            school.name + " " + school.city + " " + school.majors.join(" "),
+          ),
         }))
         .filter((school) => school.score >= 150)
         .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
@@ -486,6 +503,79 @@ export function createWorkflowApi(ctx: Context) {
     }
   }
   return {
+    async catalogConfig(): Promise<CatalogConfigSummary> {
+      catalogHttp();
+      return request("/admin/school-catalog/config");
+    },
+    async catalogRuns(
+      offset = 0,
+    ): Promise<{ items: CatalogSummary[]; nextOffset: number | null }> {
+      catalogHttp();
+      return request("/admin/school-catalog/runs?offset=" + offset);
+    },
+    async catalogRun(
+      id: string,
+      offset = 0,
+      kind = "all",
+      query = "",
+    ): Promise<CatalogRun> {
+      catalogHttp();
+      return request(
+        "/admin/school-catalog/runs/" +
+          encodeURIComponent(id) +
+          "?offset=" +
+          offset +
+          "&kind=" +
+          encodeURIComponent(kind) +
+          "&q=" +
+          encodeURIComponent(query),
+      );
+    },
+    async catalogTrigger(key: string): Promise<CatalogSummary> {
+      catalogHttp();
+      return request("/admin/school-catalog/runs", "POST", undefined, { key });
+    },
+    async catalogAnalyze(
+      id: string,
+      version: number,
+      key: string,
+    ): Promise<CatalogSummary> {
+      catalogHttp();
+      return request(
+        "/admin/school-catalog/runs/" + encodeURIComponent(id) + "/analyze",
+        "POST",
+        { expectedVersion: version },
+        { key },
+      );
+    },
+    async catalogReview(
+      id: string,
+      input: {
+        expectedVersion: number;
+        decision: "approve" | "reject";
+        reason: string;
+        identifiers: string[] | null;
+        acknowledgeAnalysis: boolean;
+      },
+      key: string,
+    ): Promise<CatalogSummary> {
+      catalogHttp();
+      return request(
+        "/admin/school-catalog/runs/" + encodeURIComponent(id) + "/review",
+        "POST",
+        input,
+        { key },
+      );
+    },
+    async catalogRaw(id: string, index: number): Promise<Blob> {
+      catalogHttp();
+      return protectedBlob(
+        "/admin/school-catalog/runs/" +
+          encodeURIComponent(id) +
+          "/snapshots/" +
+          index,
+      );
+    },
     async login(
       identifier: string,
       password: string,
@@ -1608,7 +1698,9 @@ export function createWorkflowApi(ctx: Context) {
         );
       return request("/admin/admission-sources");
     },
-    async crawlRuns(cursor: string | null = null): Promise<Page<CrawlRunSummary>> {
+    async crawlRuns(
+      cursor: string | null = null,
+    ): Promise<Page<CrawlRunSummary>> {
       if (isMock)
         throw new ApiError(
           503,
@@ -1631,11 +1723,7 @@ export function createWorkflowApi(ctx: Context) {
         );
       return request("/admin/admissions/crawl", "POST", {}, { key });
     },
-    async crawlRun(
-      id: string,
-      offset = 0,
-      limit = 200,
-    ): Promise<CrawlRun> {
+    async crawlRun(id: string, offset = 0, limit = 200): Promise<CrawlRun> {
       if (isMock)
         throw new ApiError(
           503,

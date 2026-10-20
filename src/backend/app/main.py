@@ -16,6 +16,7 @@ from app.modules.admissions.crawl_router import router as admissions_crawl
 from app.modules.admissions.router import router as admissions
 from app.modules.agent.router import router as agent
 from app.modules.agent.signals_router import router as chat_profile_signals
+from app.modules.catalog.router import router as school_catalog
 from app.modules.community.content import router as content
 from app.modules.community.router import router as accounts
 from app.modules.history.router import router as history
@@ -147,5 +148,6 @@ def create_app(settings: Settings | None = None, *, contract_version="0.4"):
         app.include_router(admissions_crawl)
         app.include_router(profile_suggestions)
         app.include_router(chat_profile_signals)
+        app.include_router(school_catalog)
         install_contract(app)
     return app

@@ -34,7 +34,6 @@ from app.db.models import (
     CrawlRun,
     ImportBatch,
     Job,
-    School,
     User,
     now,
 )
@@ -58,7 +57,7 @@ from app.modules.admissions.prompts import (
     build_extraction_prompt,
     build_link_prompt,
 )
-from app.modules.admissions.service import AdmissionRow, ImportInput, enqueue_import
+from app.modules.admissions.service import AdmissionRow, ImportInput, enqueue_import, find_school
 from app.modules.community.schemas import StrictModel
 
 logger = logging.getLogger("admissions.crawl")
@@ -1097,7 +1096,7 @@ def _preflight_and_build_payloads(
     supersedes = review.supersedes_import_id
     seen_old_imports: set[str] = set()
     for row in all_rows:
-        school = db.scalar(select(School).where(School.code == row.school_code))
+        school = find_school(db, row.school_code, row.school_name)
         if not school:
             continue
         old = list(

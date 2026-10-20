@@ -6,6 +6,8 @@
 
 ## 协议与实现范围
 
+新增全国院校基础名录扩展：部署自动完整抓取教育部普通/成人高校名单，AI分析后由管理员决定更新。范围独立于浙江招生计划，接口和版本规则见 [CATALOG.md](CATALOG.md)；名录基础资料本身不提供跨省推荐规则。
+
 业务前缀 `/api/v1`，成功 `{data,request_id}`，失败 `{error:{code,message,details:{field_errors?}},request_id}`。写请求带允许的 Origin 和 `X-Requested-With:NightVoyage`；注册、审批、创建/补问/取消推荐、投稿、推荐反馈按约定传 Idempotency-Key。同操作同键同内容返回原业务对象，不同内容409。状态码、版本和可空字段以共享 v0.4 DTO 为准。
 
 后端 `app/modules/protocol/` 实现生产边界，按共享 JSON Schema 校验公开 DTO，再转换至 Pydantic/领域服务；内部保留画像、来源、任务及事件版本快照。`create_app(...,contract_version="0.1")` 仅用于独立旧领域回归测试，不是默认部署入口，不额外挂载旧生产路径。旧响应夹具放在仓库根目录 test/backend/fixtures，避免新版契约被旧测试覆盖。生成后端 OpenAPI 时复用共享公开定义，再补充管理员导入等后端接口；修改时须同时运行两端契约检查。

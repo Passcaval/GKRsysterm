@@ -111,6 +111,17 @@ def all_schools(db):
                 "history": [],
             }
         views[str(s.id)]["historical_risk"] = "unknown"
+        basic = s.data.get("catalog_basic")
+        if basic:
+            views[str(s.id)]["level"] = basic["education_level"]
+            views[str(s.id)]["description"] = (
+                f"学校标识码：{basic['identifier']}；主管部门：{basic['department']}；"
+                f"类别：{'普通高等学校' if basic['category'] == 'ordinary' else '成人高等学校'}；"
+                f"备注：{basic.get('remarks') or '无'}。基础名录不表示已取得该校招生计划。"
+            )
+            views[str(s.id)]["source_ids"] = list(
+                dict.fromkeys([*views[str(s.id)]["source_ids"], *s.data.get("source_ids", [])])
+            )
     return list(views.values())
 
 

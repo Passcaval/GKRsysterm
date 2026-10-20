@@ -72,6 +72,8 @@ pnpm run dev
 
 ## 自动验证
 
+全国院校基础资料的启动抓取、逐批AI分析、差异审核和版本发布见 [CATALOG.md](../../docs/contracts/CATALOG.md)。新增配置为 `config/school_catalog.json`；本机启动Worker时需要包含 `catalog_fetch,catalog_analyze`（不传--task-types默认全部）。正式Compose已配置相应任务类型，并保证数据库迁移先于Worker完成。需要升级依赖锁文件后运行，HTTP客户端已包含SOCKS代理支持。
+
 测试只允许以 `_test` 结尾的 PostgreSQL 数据库，会清空其中本项目的表。第一次先创建独立库（已存在时不重复执行）：
 
 ```powershell
