@@ -24,19 +24,37 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
     depends_on:
       postgres: { condition: service_healthy }
-    volumes: [private_storage:/app/runtime/private]
+    volumes:
+      - private_storage:/app/runtime/private
+      - ../config:/app/config:ro
   worker:
     build:
       context: ..
       dockerfile: src/backend/Dockerfile
     restart: unless-stopped
-    command: ["python", "-m", "app.workers.runner"]
+    command: ["python", "-m", "app.workers.runner", "--task-types", "import,recommendation"]
     env_file: .env
     environment:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
     depends_on:
       postgres: { condition: service_healthy }
-    volumes: [private_storage:/app/runtime/private]
+    volumes:
+      - private_storage:/app/runtime/private
+      - ../config:/app/config:ro
+  crawl-worker:
+    build:
+      context: ..
+      dockerfile: src/backend/Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "app.workers.runner", "--task-types", "crawl"]
+    env_file: .env
+    environment:
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    depends_on:
+      postgres: { condition: service_healthy }
+    volumes:
+      - private_storage:/app/runtime/private
+      - ../config:/app/config:ro
   frontend:
     build: { context: ../src/frontend }
     restart: unless-stopped

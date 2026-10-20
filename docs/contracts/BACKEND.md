@@ -22,9 +22,49 @@
 | 投稿、编辑、删除、私密、人工审核 | 已实现基础流程、版本及权限；编辑重新待审，私密内容不会出现在公开列表；不包含M2的主张/可信度评估 |
 | 学校认证材料 | 可受控提交，202 pending；完整认证审批尚未开放，admin不返回verification:review权限；人工发布帖子不授予学校认证 |
 | 历史、记忆、共享 | 本人推荐历史已实现；M3记忆返回空、跨用户共享保持关闭，写入未开放返回503；页面明确提示并禁用真实模式共享开关 |
-| AI聊天/向量检索 | M2–M4尚未接入，聊天SSE明确发送未接入模型错误；不返回演示答案 |
+| AI 领航员聊天 | `POST /chat/stream` 已接入 OpenAI 兼容流式模型；仅检索已发布招生单位，SSE 返回工具状态、证据、文本增量和完成事件；未配置模型返回 503，不伪造答案。会话消息持久化；向量检索和工具型 Agent 未实现 |
 
 共享契约50个操作都能路由；未开放操作返回明确错误，不代表50项业务全部完成。管理员导入等为后端额外接口。完整操作与DTO见 [API.md](API.md)，M0–M1实际范围以本页为准。
+
+## 领航员聊天（`POST /api/v1/chat/stream`）
+
+请求体为 `{"message": "...", "conversation_id": "..."}`（v0.4；旧 v0.1 兼容字段为 `conversationId`），需要登录。后端会：
+
+1. 取用户最新画像和当前会话最近 8 条消息；
+2. 从**已发布**的 `admission_units` 中按专业、院校、城市等关键词检索最多 10 条，并按用户分数/位次的接近程度排序；
+3. 把画像和检索结果作为不可信数据放入系统提示，要求模型不编造代码、分数、位次、学费和选科；
+4. 调用 OpenAI 兼容的 `chat/completions` 流式接口，转发文本增量。
+
+SSE 事件（`data: <JSON>`）：
+
+- `tool_start` / `tool_end`：`{tool:"official_search", text}`
+- `evidence`：`{source_ids:[...]}`，供前端“查看 N 条依据”
+- `delta`：`{text}`，文本增量
+- `done`：`{conversation_id}`（v0.4）或 `{conversationId}`（v0.1）
+- `error`：`{text}`，模型不可用或没有返回内容
+
+未配置 `MODEL_*` 时返回 503 `MODEL_NOT_CONFIGURED`，不创建流。模型只能看到画像和检索上下文，不拥有数据库、URL 或工具权限；聊天不是正式推荐，个性化冲稳保仍需走画像 + 推荐任务。
+
+## 领航员驱动的画像校准
+
+聊天消息不会静默改写画像。后端从用户消息中识别明确出现的生源省份、高考分数、省内位次和完整三门选科，与当前画像比较后生成 `chat_profile_signals` 待确认记录；记录同时保存本次检索的 `source_ids`，作为可审计的搜索反馈数据。
+
+- SSE 在模型回答前发送 `profile_update` 事件：`signal_id`、`changes`（`field`/`label`/`old`/`new`）、`expected_version`、`question`、`source_ids`。
+- 前端显示确认卡片，用户点击“更新画像”或“保持原样”后才提交。
+- `POST /api/v1/chat/profile-signals/{signal_id}/resolve` 接收 `{decision:"confirm"|"reject", expected_version}`；确认时使用当前画像版本创建新的 `ProfileVersion`，原版本保留在画像历史中；版本冲突返回 409。
+- 该接口是后端专属，不改变共享 50 操作契约。信号只允许修改省份、分数、位次、选科四项；其他画像字段仍通过 `PATCH /me/profile` 修改。
+- 用户在画像表单保存后可以随时再次进入 `/#/profile` 修改；`Me` 页提供“修改考生档案”入口。每次保存都生成新版本，推荐任务绑定创建时的画像版本。
+
+## 考生画像、模糊搜索与分支推荐
+
+个性化推荐至少需要**生源省份、报考年份、分数、位次和同意使用画像**。其他字段（选科、城市偏好、专业兴趣、学费预算、位次口径、报考批次）为可选：
+
+- 前端画像表单允许先保存草稿；生成推荐时，缺少必需字段会返回 `waiting_input` 和补问，不会静默编造。
+- 缺少可选字段时推荐仍会执行，但所有相关硬条件标记为“待确认”，不会进入 `items` 合格候选，而是进入 `pending_confirmation`。
+- 结果额外返回 `missing_info`（缺失字段及补充建议）和 `branches`（最多三种策略分支：专业优先、地域优先、成本优先）。每个分支包含 `pros`、`cons`、`missing_fields` 和 `item_ids`，只引用同一次结果中已校验的候选；分支是不同排序视角，不是新的录取结论。
+- 结果最多展示最接近的 30 条合格候选和 30 条待确认候选；超出时提示补充偏好缩小范围。
+- `GET /api/v1/me/profile/suggestions?q=` 是后端专属的模糊搜索接口（不属于共享 50 操作），从已发布招生单位/院校元数据返回城市、专业和院校建议；支持部分匹配和字符重叠，用于画像表单的输入提示。
+- 共享 `Profile` schema 未改变；前端仍提交完整字段（可选字段用空数组/null），后端 `InternalProfile` 接受草稿。v0.1 的严格画像接口仅作为回归兼容。
 
 ## 账号、证据与权限
 
@@ -49,6 +89,21 @@ ImportInput必填 source_url、source_title、published_at（带时区）、loca
 history每项year/rank/score/rank_cohort/comparable，年份必须早于招生年。CSV的required_subjects、additional_requirements、history使用JSON列，tuition/plan_count使用JSON数值或null，含逗号时用标准CSV引号转义。完整输入模型见API的/docs。
 
 保存规范化导入快照及SHA-256、来源URL/标题/发布时间/位置/接收时间，单位与来源不可变版本可回查。没有原始官方网页/PDF自动存档，CSV原始字节也不单独归档；此hash不是官方原件校验值。没有预置真实招生数据，测试资料不会写入开发库。
+
+## 招生数据自动抓取（2026-10-19 增量）
+
+手工导入仍然是兜底。新增的自动抓取由 `config/admission_sources.json` 驱动；API 和 Worker 在启动时读取同一份配置，配置缺失/非法时应用仍可启动，但自动抓取关闭、手工导入回退到 `Settings.source_hosts`。
+
+- `sources` 为空且 `discovery.enabled=true` 时，`crawl-worker` 启动后会自动创建一次抓取任务；同一 `config_fingerprint` 只自动尝试一次，已有 active 招生单位或已有同指纹运行时不重复触发。`sources` 非空时由管理员通过 API/CLI 触发，不在启动时自动联网。
+- 允许域名、后缀、入口页、深度、页数、超时、大小、模型调用预算均在配置文件中；模型密钥只从 `MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME` 读取。`APP_ENV=production` 时禁止 `allow_private_hosts_for_tests=true`。
+- 后端只抓 `allowed_hosts`/`allowed_suffixes` 内的 HTTPS 页面（测试模式允许 HTTP/私网），逐跳校验重定向，拒绝私网/环回地址，限制大小、超时、重定向次数和同域频率；支持 HTML 表格、PDF 文本和 XLS/XLSX 附件。真实来源中常见 `downfile.jsp` 把 XLS 标成 `text/html`，抓取器按文件魔数识别，不依赖响应头。电子表格按表头别名（学校代码/名称、专业代码/名称、计划数、学费、选科、批次、分数/位次等）确定性映射，避免让模型逐行猜测数千行数据；缺少城市/院校省份/简称时写“待核对”或派生值并记录 warning，学费/选科未知保持 null，当年投档分/位次写入 `description`。扫描件、JS 渲染页、无法识别表头的表格会跳过而不是伪造。
+- 模型只做两件事：从候选链接中筛选相关页面、从页面文本抽取 `AdmissionRow`。模型返回的 URL 必须再次通过白名单校验；抽取行必须通过 Pydantic/业务校验，证据片段找不到时标记 `evidence_unverified`，未知值保持 null，不编造代码/数字。
+- 抽取结果进入 `crawl_runs`/`crawl_pages` 暂存区，保存原始快照、URL、内容哈希、模型/提示词版本、逐行证据和校验状态；**未审核数据不会出现在 `/schools`、`/admission-units`**。
+- 管理员审核 `POST /admin/admissions/crawl/{id}/review`：`approve` 按页面分组生成 `ImportBatch` + `job(import)`，复用现有 Worker/`process_import` 发布；`reject` 只记录结论。审核支持 `expected_version`、幂等键、`supersedes_import_id`、`rows_override`（按页面修正行）和 `acknowledge_published_at_fallback`（页面无官方发布时间时显式使用抓取时间）。
+- 新增后台接口（均需 admin）：`GET /admin/admission-sources`、`GET/POST /admin/admissions/crawl`、`GET /admin/admissions/crawl/{id}`、`GET /admin/admissions/crawl/{id}/pages/{page_id}/raw`、`POST /admin/admissions/crawl/{id}/review`。原始快照以附件下载，HTML 不在管理端同源内联渲染；清理后返回 410 `SNAPSHOT_PURGED`。
+- 发布时 `Source.data` 记录 `origin=crawl`、`crawl_run_id`、`crawl_page_id`、`raw_content_hash`、`model_name`、`prompt_version`、`confidence`、`published_at_source`；`year` 取行内 `exam_year`，摘要不再固定写“人工复核导入”。
+- 状态：`queued → running → awaiting_review → approved → publishing → succeeded/partial/failed`；管理员驳回为 `rejected`。失败/驳回不会自动重试，需管理员再次触发或修改配置。
+- 当前仍只覆盖浙江 2026 普通类、一个招生单位一个专业；缺少 school_code/unit_code 等必填字段的行需要管理员 `rows_override` 补齐或改用手工导入。源站结构变化、robots 拒绝、模型不可用或网络不可达时，手工 JSON/CSV 导入继续可用。
 
 ## 推荐与版本语义
 

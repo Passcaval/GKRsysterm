@@ -156,12 +156,40 @@ export interface Verification {
   schoolId: string;
   submittedAt: string;
 }
+export interface ProfileUpdateChange {
+  field: string;
+  label: string;
+  old: unknown;
+  new: unknown;
+}
+export interface ProfileSignalResult {
+  signal: {
+    signalId: string;
+    status: string;
+    changes: ProfileUpdateChange[];
+    sourceIds: string[];
+    question: string;
+    queryText?: string;
+  };
+  profile: Profile | null;
+}
 export interface ChatEvent {
-  type: "tool_start" | "tool_end" | "delta" | "evidence" | "done" | "error";
+  type:
+    | "tool_start"
+    | "tool_end"
+    | "delta"
+    | "evidence"
+    | "profile_update"
+    | "done"
+    | "error";
   text?: string;
   tool?: string;
   sourceIds?: string[];
   conversationId?: string;
+  signalId?: string;
+  changes?: ProfileUpdateChange[];
+  expectedVersion?: number;
+  question?: string;
 }
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -245,6 +273,20 @@ export interface RecommendationItem {
   evidenceIds: string[];
   warnings: string[];
 }
+export interface RecommendationBranch {
+  branchId: string;
+  title: string;
+  summary: string;
+  pros: string[];
+  cons: string[];
+  missingFields: string[];
+  itemIds: string[];
+}
+export interface MissingInfo {
+  field: string;
+  text: string;
+  required: boolean;
+}
 export interface RecommendationRun {
   runId: string;
   status: RunStatus;
@@ -257,10 +299,17 @@ export interface RecommendationRun {
   createdAt: string;
   questions: RunQuestion[];
   items: RecommendationItem[];
+  branches?: RecommendationBranch[];
+  missingInfo?: MissingInfo[];
   validation: { status: "pending" | "passed" | "failed"; summary: string };
   lastEventId: number;
   summary: string;
   error: string | null;
+}
+export interface ProfileSuggestions {
+  cities: string[];
+  majors: string[];
+  schools: { id: string; name: string; city: string }[];
 }
 export interface CreateRunInput {
   question: string;
@@ -312,6 +361,124 @@ export interface HistoryEntry {
   createdAt: string;
   profileVersionId: string | null;
 }
+export interface CrawlSourceSummary {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  maxDepth: number;
+  expect: "auto" | "html" | "pdf";
+}
+
+export interface AdmissionSourceSummary {
+  configPath: string;
+  configError: string | null;
+  modelConfigured: boolean;
+  modelName: string | null;
+  config: {
+    version: number;
+    scope: {
+      provinceCode: string;
+      examYear: number;
+      examCategory: string;
+    };
+    sources: CrawlSourceSummary[];
+    discovery: {
+      enabled: boolean;
+      autoStart: boolean;
+      entrypoints: string[];
+      allowedHosts: string[];
+      allowedSuffixes: string[];
+      maxDepth: number;
+      maxPages: number;
+      maxLinksPerPage: number;
+      keywords: string[];
+    };
+    crawl: Record<string, unknown>;
+    model: Record<string, unknown>;
+    publish: { requireReview: boolean };
+    configFingerprint: string;
+  } | null;
+}
+
+export interface CrawlRunSummary {
+  crawlRunId: string;
+  status: string;
+  triggerType: "startup" | "admin";
+  createdAt: string;
+  finishedAt: string | null;
+  modelName: string | null;
+  promptVersion: string | null;
+  configFingerprint: string;
+  version: number;
+  rowCount: number;
+  validRowCount: number;
+  importIds: string[];
+  warningCount: number;
+  errorCount: number;
+}
+
+export interface CrawlPageSummary {
+  pageId: string;
+  url: string;
+  depth: number;
+  status: "pending" | "fetched" | "extracted" | "skipped" | "failed";
+  httpStatus: number | null;
+  contentType: string | null;
+  contentHash: string | null;
+  title: string | null;
+  fetchedAt: string | null;
+  publishedAt: string | null;
+  textChars: number;
+  rowCount: number;
+  hasSnapshot: boolean;
+  error: string | null;
+}
+
+export interface CrawlRow {
+  rowId: string;
+  rowFingerprint?: string;
+  data: Record<string, unknown>;
+  evidence: string;
+  locator: string;
+  confidence: number | null;
+  validation: {
+    status: "valid" | "invalid";
+    errors: { field: string; message: string }[];
+    warnings: string[];
+  };
+  pageId?: string;
+  pageUrl?: string;
+  pageTitle?: string | null;
+}
+
+export interface CrawlRun extends CrawlRunSummary {
+  progress: Record<string, unknown>;
+  pagesSummary: Record<string, unknown>;
+  warnings: unknown[];
+  errors: unknown[];
+  rows: CrawlRow[];
+  imports: { importId: string; status: string; errors: unknown[] }[];
+  review: {
+    reviewedAt: string | null;
+    reviewedBy: string | null;
+    reason: string | null;
+  };
+  pages: CrawlPageSummary[];
+  rowTotal: number;
+  rowOffset: number;
+  rowLimit: number;
+}
+
+export interface CrawlReviewInput {
+  decision: "approve" | "reject";
+  reason: string;
+  expectedVersion: number;
+  supersedesImportId?: string | null;
+  acknowledgePublishedAtFallback?: boolean;
+  rowsOverride?: Record<string, Record<string, unknown>[]> | null;
+}
+
 export function hasPermission(user: User | null, permission: string): boolean {
   return !!user?.permissions?.includes(permission);
 }

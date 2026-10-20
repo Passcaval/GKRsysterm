@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   ChevronRight,
   Menu,
+  Database,
 } from "lucide-react";
 import { Provider, useApp } from "./store";
 import { isMock } from "./api";
@@ -118,6 +119,7 @@ function App() {
       "/register": "注册申请",
       "/application": "申请状态",
       "/admin/registrations": "注册审核",
+      "/admin/admissions": "招生数据抓取",
       "/history": "历史与偏好授权",
       "/admin/verifications": "学校认证审核",
     }[path] ||
@@ -241,6 +243,12 @@ function App() {
             <button onClick={() => navigate("/admin/registrations")}>
               <UserRound size={18} />
               <span>注册申请审核</span>
+            </button>
+          )}
+          {hasPermission(data.user, "admissions:import") && (
+            <button onClick={() => navigate("/admin/admissions")}>
+              <Database size={18} />
+              <span>招生数据抓取</span>
             </button>
           )}
           <div className="sidebar-note">

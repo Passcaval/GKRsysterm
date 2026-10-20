@@ -17,6 +17,40 @@ test("SSE handles byte/chunk boundaries, CRLF, comments, and multiple events", (
   );
   p.finish();
 });
+test("SSE profile_update carries an explicit confirmation payload", () => {
+  const payload = {
+    type: "profile_update",
+    signal_id: "signal-1",
+    expected_version: 2,
+    question: "要更新考生画像吗？",
+    source_ids: ["source-1"],
+    changes: [
+      { field: "province", label: "生源省份", old: "河南", new: "浙江" },
+    ],
+  };
+  assert.deepEqual(
+    new EventDecoder().push("data: " + JSON.stringify(payload) + "\n\n"),
+    [
+      {
+        type: "profile_update",
+        signalId: "signal-1",
+        expectedVersion: 2,
+        question: "要更新考生画像吗？",
+        sourceIds: ["source-1"],
+        changes: [
+          { field: "province", label: "生源省份", old: "河南", new: "浙江" },
+        ],
+      },
+    ],
+  );
+  assert.throws(
+    () =>
+      new EventDecoder().push(
+        'data: {"type":"profile_update","signal_id":"signal-1"}\n\n',
+      ),
+    /字段/,
+  );
+});
 test("SSE refuses malformed JSON and incomplete stream instead of silently succeeding", () => {
   assert.throws(() => new EventDecoder().push("data: invalid\n\n"));
   const p = new EventDecoder();

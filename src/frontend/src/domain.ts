@@ -43,15 +43,20 @@ export function classify(
 }
 export function validateProfile(p: Profile): string[] {
   const errors: string[] = [];
+  // Province, score and rank are required when creating a recommendation
+  // (enforced by missingForIntent and the backend). A profile may still be
+  // saved as a draft so the user can fill optional details later.
   if (!Number.isInteger(p.year) || p.year < 2024 || p.year > 2035)
     errors.push("请填写 2024–2035 年的报考年份");
   if (
     p.score !== null &&
+    p.score !== undefined &&
     (!Number.isInteger(p.score) || p.score < 0 || p.score > 900)
   )
     errors.push("分数必须为 0–900 的整数，请按所在省份的计分规则填写");
   if (
     p.rank !== null &&
+    p.rank !== undefined &&
     (!Number.isInteger(p.rank) || p.rank < 1 || p.rank > 5000000)
   )
     errors.push("请输入有效的省内位次");

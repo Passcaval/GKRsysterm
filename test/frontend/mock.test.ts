@@ -103,6 +103,10 @@ test("Mock纵向闭环：申请幂等、身份占用、独立审核、双标识�
     const proposal = await api.parseProfile("浙江，位次23500");
     assert.equal(proposal.proposedChanges.rank, 23500);
     assert.equal((await api.bootstrap()).profile, null);
+    const suggestions = await api.profileSuggestions("计算");
+    assert.ok(
+      suggestions.majors.some((major: string) => major.includes("计算机")),
+    );
     const partial = await api.profile({
       province: "",
       year: 2026,
@@ -148,6 +152,7 @@ test("Mock纵向闭环：申请幂等、身份占用、独立审核、双标识�
       risk.runId,
       {
         province_code: "浙江",
+        score: "628",
         subjects: "物理,化学,生物",
         rank: "23500",
         rank_cohort: "浙江普通类省内位次",

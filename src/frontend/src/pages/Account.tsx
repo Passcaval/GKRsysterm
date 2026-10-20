@@ -6,6 +6,7 @@ import {
 } from "./Identity";
 import History from "./History";
 import VerificationAdmin from "./VerificationAdmin";
+import AdmissionsAdmin from "./AdmissionsAdmin";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -62,15 +63,65 @@ function ProfilePage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [natural, setNatural] = useState(""),
     [proposal, setProposal] = useState<Partial<Profile> | null>(null),
-    [versions, setVersions] = useState<Profile[]>([]);
+    [versions, setVersions] = useState<Profile[]>([]),
+    [suggestQuery, setSuggestQuery] = useState(""),
+    [suggestions, setSuggestions] = useState<{
+      cities: string[];
+      majors: string[];
+      schools: { id: string; name: string; city: string }[];
+    }>({ cities: [], majors: [], schools: [] });
+  useEffect(() => {
+    if (
+      data.profile &&
+      data.profile.profileVersionId !== value.profileVersionId
+    )
+      setValue(data.profile);
+  }, [data.profile?.profileVersionId]);
+  useEffect(() => {
+    const query = suggestQuery.trim();
+    if (!query) {
+      setSuggestions({ cities: [], majors: [], schools: [] });
+      return;
+    }
+    let active = true;
+    const timer = setTimeout(() => {
+      api
+        .profileSuggestions(query)
+        .then((value) => {
+          if (active) setSuggestions(value);
+        })
+        .catch(() => {
+          if (active) setSuggestions({ cities: [], majors: [], schools: [] });
+        });
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [suggestQuery]);
   function patch<K extends keyof Profile>(key: K, v: Profile[K]) {
     setValue((p) => ({ ...p, [key]: v }));
   }
+  function addCity(city: string) {
+    if (!city || value.cities.includes(city)) return;
+    patch("cities", [...value.cities, city]);
+    notify(`已加入城市偏好：${city}`);
+  }
+  function addInterest(major: string) {
+    if (!major || value.interests.includes(major)) return;
+    patch("interests", [...value.interests, major]);
+    notify(`已加入专业兴趣：${major}`);
+  }
+  const suggestionCount =
+    suggestions.cities.length +
+    suggestions.majors.length +
+    suggestions.schools.length;
   const fields = [
     <div className="form-grid" key="basic">
       <label>
-        生源省份
+        生源省份（必填）
         <select
+          required
           value={value.province}
           onChange={(e) => patch("province", e.target.value)}
         >
@@ -124,8 +175,9 @@ function ProfilePage() {
         />
       </label>
       <label>
-        高考分数
+        高考分数（必填）
         <input
+          required
           type="number"
           min="0"
           max="900"
@@ -139,8 +191,9 @@ function ProfilePage() {
         />
       </label>
       <label>
-        省内位次
+        省内位次（必填）
         <input
+          required
           type="number"
           min="1"
           max="5000000"
@@ -151,7 +204,8 @@ function ProfilePage() {
         />
       </label>
       <p className="form-hint">
-        分数和位次可以暂不填写。校园生活查询不需要成绩，风险分析会单独补问位次及口径。
+        省份、分数、位次是生成个性化推荐的必填信息。选科、城市、专业、预算、
+        批次和位次口径可以稍后补充；系统仍会先给出多种可能方向，并分析各自利弊。
       </p>
       <label>
         位次口径
@@ -170,8 +224,10 @@ function ProfilePage() {
       </label>
     </div>,
     <div key="subjects">
-      <h3>你的三门选考科目</h3>
-      <p className="muted">选择 3 门，专业报考条件以招生章程为准。</p>
+      <h3>你的选考科目（可选）</h3>
+      <p className="muted">
+        最多选择 3 门。补充完整后可以判断专业选科硬条件；暂不填写也可以继续生成推荐，结果会标注“选科待确认”。
+      </p>
       <div className="subject-grid">
         {["物理", "化学", "生物", "历史", "政治", "地理"].map((s) => (
           <label
@@ -200,6 +256,94 @@ function ProfilePage() {
       </div>
     </div>,
     <div className="form-grid" key="preferences">
+      <div
+        className="profile-search"
+        style={{ gridColumn: "1 / -1" }}
+      >
+        <label>
+          模糊搜索城市 / 专业 / 院校（可选）
+          <input
+            value={suggestQuery}
+            onChange={(e) => setSuggestQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.preventDefault();
+            }}
+            placeholder="输入“杭”“计算”或“温州医科”，支持部分匹配"
+          />
+        </label>
+        {suggestQuery.trim() && (
+          <div className="profile-suggestions">
+            {suggestionCount === 0 ? (
+              <p className="muted">
+                没有找到匹配项，可以直接在下方手动填写；补充后仍可生成推荐。
+              </p>
+            ) : (
+              <div className="suggestion-groups">
+                {suggestions.cities.length > 0 && (
+                  <div className="suggestion-group">
+                    <strong>城市建议</strong>
+                    <div className="form-actions">
+                      {suggestions.cities.slice(0, 5).map((city) => (
+                        <button
+                          type="button"
+                          className="text-button"
+                          key={"city-" + city}
+                          onClick={() => addCity(city)}
+                        >
+                          城市：{city}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {suggestions.majors.length > 0 && (
+                  <div className="suggestion-group">
+                    <strong>专业建议</strong>
+                    <div className="form-actions">
+                      {suggestions.majors.slice(0, 6).map((major) => (
+                        <button
+                          type="button"
+                          className="text-button"
+                          key={"major-" + major}
+                          onClick={() => addInterest(major)}
+                        >
+                          专业：{major}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {suggestions.schools.length > 0 && (
+                  <div className="suggestion-group">
+                    <strong>院校建议</strong>
+                    <div className="form-actions">
+                      {suggestions.schools.slice(0, 3).map((school) => (
+                        <button
+                          type="button"
+                          className="text-button"
+                          key={"school-" + school.id}
+                          onClick={() => {
+                            if (school.city && school.city !== "待核对") {
+                              addCity(school.city);
+                            } else {
+                              notify(`${school.name} 的城市待核对，可手动填写`);
+                            }
+                          }}
+                        >
+                          院校：{school.name}
+                          {school.city && school.city !== "待核对"
+                            ? `（${school.city}）`
+                            : ""}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <label>
         期待的城市（用逗号分隔）
         <input
@@ -992,6 +1136,8 @@ export default function Account({ path }: { path: string }) {
     <ApplicationStatus />
   ) : path === "/admin/registrations" ? (
     <RegistrationAdmin />
+  ) : path === "/admin/admissions" ? (
+    <AdmissionsAdmin />
   ) : path === "/profile" ? (
     <ProfilePage />
   ) : path === "/lighthouse" ? (

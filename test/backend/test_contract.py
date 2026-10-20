@@ -83,5 +83,5 @@ def test_actual_postgres_responses_match_frontend_contract(
     error = student.put("/api/v1/me/plan", json=plan)
     validate("Error", error.json())
     stream = student.post("/api/v1/chat/stream", json={"message": "测试对话边界"})
-    assert stream.status_code == 200 and "text/event-stream" in stream.headers["content-type"]
-    assert '"type": "error"' in stream.text and '"type": "done"' in stream.text
+    assert stream.status_code == 503
+    validate("Error", stream.json())
