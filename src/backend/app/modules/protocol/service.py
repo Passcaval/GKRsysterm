@@ -11,7 +11,7 @@ from app.core.errors import DomainError, missing
 from app.db.models import RegistrationEvidence, Source, User
 from app.modules.community.registration import public_status
 from app.modules.community.router import verified
-from app.modules.profiles.service import ProfileInput
+from app.modules.profiles.service import ProfileInput, recommendation_missing
 
 
 def wire(value):
@@ -129,6 +129,7 @@ def profile_view(record):
         },
         "preferred_regions": p["cities"],
         "preferred_majors": p["interests"],
+        "preferred_schools": p.get("schools", []),
         "accept_adjustment": p["acceptAdjustment"],
         "consent": p["consent"],
         "preferences": p.get("preferences", []),
@@ -158,6 +159,7 @@ def internal_profile(raw, existing=None):
         "exam_year": "year",
         "preferred_regions": "cities",
         "preferred_majors": "interests",
+        "preferred_schools": "schools",
         "accept_adjustment": "acceptAdjustment",
     }
     for key, value in raw.items():
@@ -178,36 +180,28 @@ def internal_profile(raw, existing=None):
 def required_questions(snapshot):
     """Fields that block a personalised recommendation.
 
-    Province, exam year, score, rank and consent are required. Subjects,
-    cities, majors, budget, cohort and batch are optional and are surfaced by
-    ``optional_questions`` instead of blocking the run.
+    Province, exam year, rank, three subjects and consent are required.
+    Score and preferences remain optional so a first recommendation can run
+    before the student has decided where or what to study.
     """
     p = snapshot.get("profile") or {}
     if snapshot.get("intent", "risk") == "campus_life":
         return []
-    missing_fields = []
-    if not p.get("province"):
-        missing_fields.append(("province_code", "请填写生源省份，例如浙江"))
-    if not p.get("year"):
-        missing_fields.append(("exam_year", "请填写报考年份"))
-    if p.get("score") is None:
-        missing_fields.append(("score", "请填写高考分数"))
-    if p.get("rank") is None:
-        missing_fields.append(("rank", "请填写省内位次"))
-    if not p.get("consent"):
-        missing_fields.append(("consent", "是否同意将画像用于本次推荐？填写 true"))
+    missing_fields = recommendation_missing(p)
     return [{"field": field, "text": text, "required": True} for field, text in missing_fields]
 
 
 def optional_questions(snapshot):
     p = snapshot.get("profile") or {}
     missing_fields = []
-    if len(p.get("subjects") or []) != 3:
-        missing_fields.append(("subjects", "补充三门选科后，可判断专业选科硬条件"))
+    if p.get("score") is None:
+        missing_fields.append(("score", "分数可稍后补充，不影响先按位次与选科推荐"))
     if not p.get("cities"):
         missing_fields.append(("cities", "补充城市偏好后，可按地域比较院校"))
     if not p.get("interests"):
         missing_fields.append(("interests", "补充专业兴趣后，可优先展示匹配方向"))
+    if not p.get("schools"):
+        missing_fields.append(("schools", "意向院校可稍后补充，先比较不同院校方向"))
     if p.get("budget") is None:
         missing_fields.append(("budget", "补充学费预算后，可排除超预算选项"))
     if not p.get("rank_cohort"):

@@ -46,6 +46,8 @@ Mock仅为本地开发：公开测试账号在README；申请、密码哈希、�
 
 `GET /me/profile` 可为null。PATCH完整画像字段加expected_version（首次0），返回新version/profile_version_id，409保留输入。`POST /me/profile/parse` 返回proposed_changes/missing_fields/questions，UI确认后才能写入。历史版本不可改写；任务冻结profile_version_id并保留original_profile_version_id。
 
+领航员首轮推荐只需要省份、年份、位次、三门选科及同意。`score` 可为null，地域/专业/预算可后补；可选 `preferred_schools: string[]` 保存院校名称。`preferred_regions` 同时支持意向省份或城市，不能用于覆盖生源省份。确定性文本识别、确认后更新及推荐快照流程见 [NAVIGATOR.md](NAVIGATOR.md)。
+
 省份province_code、exam_year、exam_category、选科、score/rank/rank_cohort分别表示，不以分数替代位次。预算为 `{amount:null,currency:"CNY",period:"year",scope:"tuition"}` 或scope=total。偏好含field/value/strength(hard|soft)/priority。未填成绩不会阻断校园生活；报考条件与风险任务按所需字段补问。
 
 院校、校区、招生单位、专业必须分开。`/admission-units` 返回招生年份、省份、科类、批次、unit_type、选科、majors及data_version；历史返回comparable/reason及单位行。未确认同口径不绘制可比风险曲线。HTTP模式不在浏览器运行浙江示例分类或补默认23500位次。

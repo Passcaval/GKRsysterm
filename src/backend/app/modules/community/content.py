@@ -125,7 +125,9 @@ def bootstrap(request: Request, user=Depends(optional_user), db=Depends(get_db))
     ]
     view = {
         "user": user_view(db, user) if user else None,
-        "profile": {k: v for k, v in profile.data.items() if k not in {"rank_cohort", "batch"}}
+        "profile": {
+            k: v for k, v in profile.data.items() if k not in {"rank_cohort", "batch", "schools"}
+        }
         if profile
         else None,
         "schools": schools,

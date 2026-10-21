@@ -83,6 +83,7 @@ export function profileToWire(p: Profile) {
     subjects: p.subjects,
     preferred_regions: p.cities,
     preferred_majors: p.interests,
+    preferred_schools: p.preferredSchools || [],
     budget: {
       amount: p.budget,
       currency: p.budgetCurrency || "CNY",
@@ -116,6 +117,7 @@ export function profileFromWire(raw: any): Profile {
     rank: p.rank ?? null,
     cities: p.preferredRegions ?? [],
     interests: p.preferredMajors ?? [],
+    preferredSchools: p.preferredSchools ?? [],
     budget: p.budget?.amount ?? null,
     budgetCurrency: p.budget?.currency ?? "CNY",
     budgetPeriod: p.budget?.period ?? "year",

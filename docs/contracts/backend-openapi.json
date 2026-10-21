@@ -2457,6 +2457,16 @@
         ],
         "summary": "提取建议，等待用户确认",
         "operationId": "post__me_profile_parse",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileParseInput"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "成功；删除操作仍返回data:null，不使用204",
@@ -2636,17 +2646,7 @@
               "type": "string"
             }
           }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProfileParseInput"
-              }
-            }
-          }
-        }
+        ]
       }
     },
     "/api/v1/schools": {
@@ -12849,6 +12849,13 @@
               "type": "string"
             }
           },
+          "preferred_schools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30
+          },
           "accept_adjustment": {
             "type": "boolean"
           },
@@ -13032,6 +13039,13 @@
               "type": "string"
             }
           },
+          "preferred_schools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30
+          },
           "accept_adjustment": {
             "type": "boolean"
           },
@@ -13199,6 +13213,13 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "preferred_schools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 30
               },
               "accept_adjustment": {
                 "type": "boolean"

@@ -72,8 +72,7 @@ export function missingForIntent(profile: Profile | null, intent: string) {
   const missing: string[] = [];
   if (!profile?.province) missing.push("province_code");
   if (!profile?.year) missing.push("exam_year");
-  if (profile?.score === null || profile?.score === undefined)
-    missing.push("score");
+  if ((profile?.subjects?.length || 0) !== 3) missing.push("subjects");
   if (profile?.rank === null || profile?.rank === undefined)
     missing.push("rank");
   if (!profile?.consent) missing.push("consent");

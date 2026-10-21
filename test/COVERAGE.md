@@ -11,7 +11,8 @@
 | 官方数据导入与追溯 | `backend/test_workflow.py`、`backend/test_v04.py` | 合成JSON/CSV、来源白名单/冲突、不可变单位、证据和院校筛选 |
 | 招生自动抓取与审核 | `backend/test_crawl.py`、`frontend/crawl.test.ts` | 配置规范化/范围校验、启动触发幂等、HTTP/SSRF/大小/重定向/robots、Fake Model 链接筛选与字段抽取、XLSX 魔数识别/表头映射、证据校验、暂存不可见、审核批准/驳回/权限、Source 溯源、原文快照与 Mock 拒绝 |
 | AI 领航员与模型流式对话 | `backend/test_chat.py`、`frontend/http.test.ts`、`frontend/sse.test.ts` | 未配置模型503、SSE tool/evidence/delta/done、已发布招生数据检索与来源、会话/历史持久化、模型失败降级、格式校验；CI 使用 FakeGateway，真实 DeepSeek 手工联调 |
-| 画像模糊搜索与可选字段 | `backend/test_profile_optional.py`、`frontend/mock.test.ts`、`frontend/workflow-domain.test.ts` | 省份/分数/位次作为推荐必需项、可选字段缺失时仍生成推荐、三分支利弊与 `missing_info`、城市/专业/院校模糊建议（含错字）、最小画像不通过硬条件仍不发布 |
+| 领航员首轮推荐与后续补充 | `backend/test_navigator_domain.py`、`backend/test_profile_optional.py`、`frontend/navigator.test.ts`、`integration/backend-smoke.mjs` | 省份/位次/三门选科即可推荐，分数和偏好可后补；生源与意向地域分开；院校/地域/专业排序；画像版本及原推荐快照保留；真实前端访问层与 PostgreSQL 闭环 |
+| 部署顺序与启动抓取 | `backend/test_deploy.py`、`backend/test_crawl.py` | 验证先迁移再启动 Worker，已有启动抓取测试覆盖幂等和无模型跳过；不代替真实 Docker 部署验收 |
 | 领航员画像校准与编辑 | `backend/test_chat_profile.py`、`frontend/sse.test.ts` | 从聊天明确语句识别省份/分数/位次/选科、`profile_update` 待确认事件、确认/拒绝、画像版本递增、重复处理409、检索来源ID作为反馈、保存后可继续 PATCH 修改 |
 | 推荐、任务与校验 | `backend/test_workflow.py`、`backend/test_v04.py` | 硬条件、unknown、独立结果校验、任务租约/发布、取消、反馈归属 |
 | SSE协议与恢复 | `frontend/sse.test.ts`、`frontend/workflow-domain.test.ts`、后端工作流用例 | 分块/CRLF/心跳/乱序/去重、格式失败、事件读取和校验后结果 |

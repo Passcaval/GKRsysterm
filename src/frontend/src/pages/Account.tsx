@@ -175,9 +175,8 @@ function ProfilePage() {
         />
       </label>
       <label>
-        高考分数（必填）
+        高考分数（可选）
         <input
-          required
           type="number"
           min="0"
           max="900"
@@ -204,8 +203,7 @@ function ProfilePage() {
         />
       </label>
       <p className="form-hint">
-        省份、分数、位次是生成个性化推荐的必填信息。选科、城市、专业、预算、
-        批次和位次口径可以稍后补充；系统仍会先给出多种可能方向，并分析各自利弊。
+        省份、位次和三门选科是生成推荐所需的信息。分数、意向地域、院校、专业与预算可以稍后补充；领航员会先推荐可比较的方向。
       </p>
       <label>
         位次口径
@@ -224,12 +222,12 @@ function ProfilePage() {
       </label>
     </div>,
     <div key="subjects">
-      <h3>你的选考科目（可选）</h3>
+      <h3>你的三门选考科目（推荐必需）</h3>
       <p className="muted">
-        最多选择 3 门。补充完整后可以判断专业选科硬条件；暂不填写也可以继续生成推荐，结果会标注“选科待确认”。
+        选择三门后即可结合位次生成推荐。尚未选满时可以保存草稿，推荐任务会提示补齐。
       </p>
       <div className="subject-grid">
-        {["物理", "化学", "生物", "历史", "政治", "地理"].map((s) => (
+        {["物理", "化学", "生物", "历史", "政治", "地理", "技术"].map((s) => (
           <label
             className={value.subjects.includes(s) ? "selected" : ""}
             key={s}
@@ -256,10 +254,7 @@ function ProfilePage() {
       </div>
     </div>,
     <div className="form-grid" key="preferences">
-      <div
-        className="profile-search"
-        style={{ gridColumn: "1 / -1" }}
-      >
+      <div className="profile-search" style={{ gridColumn: "1 / -1" }}>
         <label>
           模糊搜索城市 / 专业 / 院校（可选）
           <input
@@ -323,11 +318,13 @@ function ProfilePage() {
                           className="text-button"
                           key={"school-" + school.id}
                           onClick={() => {
-                            if (school.city && school.city !== "待核对") {
-                              addCity(school.city);
-                            } else {
-                              notify(`${school.name} 的城市待核对，可手动填写`);
-                            }
+                            patch("preferredSchools", [
+                              ...new Set([
+                                ...(value.preferredSchools || []),
+                                school.name,
+                              ]),
+                            ]);
+                            notify(`已加入意向院校：${school.name}`);
                           }}
                         >
                           院校：{school.name}
@@ -345,7 +342,7 @@ function ProfilePage() {
         )}
       </div>
       <label>
-        期待的城市（用逗号分隔）
+        期待的省份或城市（可选，用逗号分隔）
         <input
           value={value.cities.join(",")}
           onChange={(e) =>
@@ -355,6 +352,16 @@ function ProfilePage() {
             )
           }
           placeholder="杭州,南京,上海"
+        />
+      </label>
+      <label>
+        意向院校（可选，用逗号分隔）
+        <input
+          value={(value.preferredSchools || []).join(",")}
+          onChange={(e) =>
+            patch("preferredSchools", e.target.value.split(/[,，、]/))
+          }
+          placeholder="尚未确定可以留空"
         />
       </label>
       <label>
@@ -433,6 +440,9 @@ function ProfilePage() {
       ...value,
       cities: value.cities.filter(Boolean),
       interests: value.interests.filter(Boolean),
+      preferredSchools: value.preferredSchools
+        ?.map((s) => s.trim())
+        .filter(Boolean),
     };
     const e = validateProfile(cleaned);
     setErrors(e);

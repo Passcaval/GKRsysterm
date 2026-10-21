@@ -39,9 +39,9 @@ test("昵称按NFC及Unicode码点处理，扩展汉字合法且不做NFKC或空
 });
 test("校园查询不被成绩阻断，风险分析按需询问；未校验和硬条件失败的项不发布", () => {
   assert.deepEqual(missingForIntent(null, "campus_life"), []);
-  assert.ok(missingForIntent(null, "risk").includes("score"));
+  assert.ok(!missingForIntent(null, "risk").includes("score"));
   assert.ok(missingForIntent(null, "risk").includes("rank"));
-  assert.ok(!missingForIntent(null, "risk").includes("subjects"));
+  assert.ok(missingForIntent(null, "risk").includes("subjects"));
   const run = {
     status: "running",
     validation: { status: "pending" },

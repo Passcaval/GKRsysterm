@@ -9475,6 +9475,13 @@
               "type": "string"
             }
           },
+          "preferred_schools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30
+          },
           "accept_adjustment": {
             "type": "boolean"
           },
@@ -9658,6 +9665,13 @@
               "type": "string"
             }
           },
+          "preferred_schools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 30
+          },
           "accept_adjustment": {
             "type": "boolean"
           },
@@ -9825,6 +9839,13 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "preferred_schools": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 30
               },
               "accept_adjustment": {
                 "type": "boolean"

@@ -43,7 +43,7 @@ export function classify(
 }
 export function validateProfile(p: Profile): string[] {
   const errors: string[] = [];
-  // Province, score and rank are required when creating a recommendation
+  // Province, three subjects and rank are required when creating a recommendation
   // (enforced by missingForIntent and the backend). A profile may still be
   // saved as a draft so the user can fill optional details later.
   if (!Number.isInteger(p.year) || p.year < 2024 || p.year > 2035)
@@ -62,6 +62,13 @@ export function validateProfile(p: Profile): string[] {
     errors.push("请输入有效的省内位次");
   if (new Set(p.subjects).size !== p.subjects.length || p.subjects.length > 3)
     errors.push("选科不能重复，当前支持最多三门选考科目");
+  if (
+    p.subjects.some(
+      (s) =>
+        !["物理", "化学", "生物", "历史", "地理", "政治", "技术"].includes(s),
+    )
+  )
+    errors.push("请选择有效的选考科目");
   if (p.budget !== null && (p.budget < 0 || !Number.isFinite(p.budget)))
     errors.push("学费预算不能为负数");
   if (!p.consent) errors.push("请同意使用档案信息生成建议");
