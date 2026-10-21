@@ -225,12 +225,6 @@ function Echoes({ school }: { school: School }) {
         <aside className="campus-information" aria-label="本校信息栏">
           <div className="panel campus-info-card">
             <span className="eyebrow">YOUR CURRENT CAMPUS</span>
-            <span
-              className="school-seal"
-              style={{ color: school.color, borderColor: school.color }}
-            >
-              {school.short}
-            </span>
             <h2>{school.name}</h2>
             <p className="muted">{school.description}</p>
             <dl>
@@ -253,7 +247,7 @@ function Echoes({ school }: { school: School }) {
                 <dd>{isMock ? `${allPosts.length} 封` : "按需加载"}</dd>
               </div>
             </dl>
-            <h3>在这里探索</h3>
+            {!!school.majors.length && <h3>在这里探索</h3>}
             <div className="campus-major-chips">
               {school.majors.map((m) => (
                 <span key={m}>{m}</span>
@@ -602,12 +596,6 @@ function SchoolDetail({ school: s }: { school: School }) {
         回到院校星图
       </button>
       <section className="school-cover">
-        <span
-          className="school-seal big"
-          style={{ color: s.color, borderColor: s.color }}
-        >
-          {s.short}
-        </span>
         <div>
           <span className="eyebrow">UNIVERSITY PROFILE</span>
           <h1>{s.name}</h1>

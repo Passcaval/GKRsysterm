@@ -237,6 +237,7 @@ export function Explore() {
           ) : (
             <button
               className="button"
+              disabled={!!sailingTo}
               onClick={async () => {
                 setLoading(true);
                 try {

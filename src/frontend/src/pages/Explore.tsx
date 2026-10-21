@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -16,7 +16,8 @@ import { isMock } from "../api";
 import { api } from "../api";
 import { useApp } from "../store";
 import { SectionTitle, SignalBadge, LinkButton } from "../components";
-import { classify, rankPosition, tierSymbol } from "../domain";
+import { classify } from "../domain";
+import { layoutAtlas } from "../atlas-layout";
 import type { School } from "../types";
 import { VoyageScene } from "../VoyageScene";
 import voyagerTop from "../assets/voyager-top.png";
@@ -60,6 +61,19 @@ export function StarMap({
     };
   }, [dockedSchoolId]);
   const root = useRef<HTMLDivElement>(null);
+  const viewport = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 640, height: 340 });
+  useLayoutEffect(() => {
+    const node = viewport.current;
+    if (!node) return;
+    const measure = () => {
+      setSize({ width: node.clientWidth, height: node.clientHeight });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   const frame = useRef<number | null>(null);
   useEffect(
     () => () => {
@@ -97,16 +111,48 @@ export function StarMap({
   const rank = data.profile?.rank ?? null;
   const mapTier = (s: School) =>
     isMock ? classify(rank, s.rank) : s.historicalRisk || "unknown";
-  const coordinate = (s: School) =>
-    isMock ? rankPosition(s.rank, ranks) : s.x;
   const docked =
     dockedInfo ||
     schools.find((s) => s.id === dockedSchoolId) ||
     data.schools.find((s) => s.id === dockedSchoolId);
-  const ranks = data.schools.map((s) => s.rank);
-  const boatPosition = {
-    x: docked ? coordinate(docked) : isMock ? rankPosition(rank, ranks) : 50,
-    y: docked?.y ?? 82,
+  const layout = useMemo(
+    () =>
+      layoutAtlas(
+        [...schools, ...(docked ? [docked] : [])],
+        size.width,
+        size.height,
+        !docked,
+      ),
+    [schools, docked, size.width, size.height],
+  );
+  const firstSchoolId = schools[0]?.id;
+  useEffect(() => {
+    viewport.current?.scrollTo(0, 0);
+  }, [firstSchoolId]);
+  const percent = (point: { x: number; y: number }) => ({
+    x: (point.x / layout.width) * 100,
+    y: (point.y / layout.height) * 100,
+  });
+  const boatPosition = percent(
+    (docked && layout.positions.get(docked.id)) || layout.boat,
+  );
+  const dockVisible = schools.some((s) => s.id === docked?.id);
+  const sailingPosition = sailingTo && layout.positions.get(sailingTo.id);
+  function locateBoat() {
+    const point = (docked && layout.positions.get(docked.id)) || layout.boat;
+    viewport.current?.scrollTo({
+      left: point.x * zoom - size.width / 2,
+      top: point.y * zoom - size.height / 2,
+      behavior: "smooth",
+    });
+  }
+  useEffect(() => {
+    if (!sailingTo) return;
+    setZoom(1);
+  }, [sailingTo]);
+  const mapSize = {
+    width: layout.width * zoom,
+    height: layout.height * zoom,
   };
   return (
     <div
@@ -132,92 +178,112 @@ export function StarMap({
           {isMock ? "示例分布" : "探索布局"}
         </span>
       </div>
-      <div className="map-body">
-        <div className="map-stars" />
-        <svg
-          viewBox="0 0 900 340"
-          preserveAspectRatio="none"
-          className="map-lines"
-          aria-hidden="true"
-        >
-          <path d="M20 270 Q220 10 510 180 T910 40" />
-          <path d="M40 300 Q330 90 900 280" />
-          <path d="M0 120 Q400 350 870 20" />
-        </svg>
-        <div
-          className="map-nodes"
-          inert={!!sailingTo}
-          style={{ transform: `scale(${zoom})` }}
-        >
-          {sailingTo && (
-            <RowingVoyage
-              from={boatPosition}
-              to={{ x: coordinate(sailingTo), y: sailingTo.y }}
-              onArrive={() => onArrive?.()}
-            />
-          )}
-          <button
-            className={`voyager-position ${sailingTo ? "vessel-departed" : ""}`}
-            style={{
-              left: `${boatPosition.x}%`,
-              top: `${boatPosition.y}%`,
-            }}
-            onClick={() => navigate("/profile")}
-            aria-label={`你的船，${docked ? `停靠${docked.name}` : `省内位次${rank?.toLocaleString() ?? "未填写位次"}`}；点击修改考生档案`}
+      <div
+        className="map-body"
+        ref={viewport}
+        tabIndex={0}
+        role="region"
+        aria-label="院校星图，可滑动浏览，使用 Tab 选择院校"
+      >
+        <div className="map-canvas" style={mapSize}>
+          <div className="map-stars" />
+          <svg
+            viewBox="0 0 900 340"
+            preserveAspectRatio="none"
+            className="map-lines"
+            aria-hidden="true"
           >
-            <span className="boat-ripple" aria-hidden="true" />
-            <img src={voyagerTop} alt="俯视下坐在船上、手持星图的航海者" />
-            <span className="position-label">
-              {docked ? "已停靠" : "你的位置"}{" "}
-              <b>{docked?.name ?? rank?.toLocaleString() ?? "未填写位次"}</b>
-            </span>
-          </button>
-          {schools.map((s) => (
-            <button
-              className={`star-node ${mapTier(s)} ${selectedSchoolId === s.id ? "selected" : ""}`}
-              data-school-id={s.id}
-              style={{
-                left: `${coordinate(s)}%`,
-                top: `${s.y}%`,
-              }}
-              key={s.id}
-              onClick={() =>
-                onSelect ? onSelect(s) : navigate("/school/" + s.id)
-              }
-              aria-label={`查看${s.name}，${isMock ? "示例" : "历史"}位次${s.rank ?? "待确认"}`}
-              aria-pressed={onSelect ? selectedSchoolId === s.id : undefined}
-            >
-              <span className="star-glow">
-                <span />
-              </span>
-              <span className="star-name">
-                <span className="map-tier" aria-hidden="true">
-                  {tierSymbol[mapTier(s)]}
-                </span>{" "}
-                {s.name}
-                <small>
-                  {s.city} · {s.rank?.toLocaleString() ?? "待确认"}
-                </small>
-              </span>
-            </button>
-          ))}
-        </div>
-        <div className="map-axis">
-          {isMock ? (
-            <>
-              ← 相对稳妥 <span>示例历史录取位次</span> 更有挑战 →
-            </>
-          ) : (
-            <span>位置仅用于浏览；报考风险以招生单位的同口径历史为准</span>
-          )}
+            <path d="M20 270 Q220 10 510 180 T910 40" />
+            <path d="M40 300 Q330 90 900 280" />
+            <path d="M0 120 Q400 350 870 20" />
+          </svg>
+          <div
+            className="map-nodes"
+            inert={!!sailingTo}
+            style={{
+              width: layout.width,
+              height: layout.height,
+              transform: `scale(${zoom})`,
+            }}
+          >
+            {sailingTo && sailingPosition && (
+              <RowingVoyage
+                from={boatPosition}
+                to={percent(sailingPosition)}
+                onArrive={() => onArrive?.()}
+              />
+            )}
+            {!dockVisible && (
+              <button
+                className={`voyager-position ${sailingTo ? "vessel-departed" : ""}`}
+                style={{
+                  left: `${boatPosition.x}%`,
+                  top: `${boatPosition.y}%`,
+                }}
+                onClick={() => navigate("/profile")}
+                aria-label={`你的船，${docked ? `停靠${docked.name}` : `省内位次${rank?.toLocaleString() ?? "未填写位次"}`}；点击修改考生档案`}
+              >
+                <span className="boat-ripple" aria-hidden="true" />
+                <img src={voyagerTop} alt="俯视下坐在船上、手持星图的航海者" />
+                <span className="position-label">
+                  {docked ? "已停靠" : "你的位置"}{" "}
+                  <b>
+                    {docked?.name ?? rank?.toLocaleString() ?? "未填写位次"}
+                  </b>
+                </span>
+              </button>
+            )}
+            {schools.map((s) => (
+              <button
+                className={`star-node ${mapTier(s)} ${selectedSchoolId === s.id ? "selected" : ""}`}
+                data-school-id={s.id}
+                style={{
+                  left: layout.positions.get(s.id)?.x,
+                  top: layout.positions.get(s.id)?.y,
+                  width: layout.nodeWidth,
+                }}
+                key={s.id}
+                onClick={() =>
+                  onSelect ? onSelect(s) : navigate("/school/" + s.id)
+                }
+                aria-label={`查看${s.name}，${isMock ? "示例" : "历史"}位次${s.rank ?? "待确认"}`}
+                aria-pressed={onSelect ? selectedSchoolId === s.id : undefined}
+                title={s.name}
+              >
+                <span
+                  className={`star-glow ${docked?.id === s.id ? "docked-star" : ""}`}
+                >
+                  {docked?.id === s.id && !sailingTo ? (
+                    <img src={voyagerTop} alt="我的船停靠在这里" />
+                  ) : (
+                    <span />
+                  )}
+                </span>
+                <span className="star-name">
+                  <span className="star-title">{s.name}</span>
+                  <small>
+                    {docked?.id === s.id ? "已停靠 · " : ""}
+                    {s.city} · {s.rank?.toLocaleString() ?? "待确认"}
+                  </small>
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <div className="map-bottom">
-        <div className="legend">
-          <span className="safe">■ 保底探索</span>
-          <span className="match">● 稳妥选择</span>
-          <span className="reach">▲ 勇敢一试</span>
-        </div>
+        {isMock ? (
+          <div className="legend">
+            <span className="safe">■ 保底探索</span>
+            <span className="match">● 稳妥选择</span>
+            <span className="reach">▲ 勇敢一试</span>
+          </div>
+        ) : (
+          <span className="map-browse-note">布局仅用于浏览</span>
+        )}
+        {layout.height * zoom > size.height + 1 && (
+          <span className="map-scroll-hint">上下滑动，探索更多院校</span>
+        )}
         {!small && (
           <div className="zoom">
             <button
@@ -228,9 +294,9 @@ export function StarMap({
               <Minus size={15} />
             </button>
             <button
-              aria-label="重置星图"
+              aria-label="定位到我的船"
               disabled={!!sailingTo}
-              onClick={() => setZoom(1)}
+              onClick={locateBoat}
             >
               <LocateFixed size={15} />
             </button>

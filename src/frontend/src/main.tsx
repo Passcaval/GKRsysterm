@@ -25,6 +25,7 @@ import "./styles.css";
 import "./voyage.css";
 import "./campus.css";
 import "./workflow.css";
+import "./atlas-layout.css";
 const Content = lazy(() => import("./pages/Content"));
 const Planning = lazy(() => import("./pages/Planning"));
 const Account = lazy(() => import("./pages/Account"));
@@ -119,7 +120,7 @@ function App() {
       "/register": "注册申请",
       "/application": "申请状态",
       "/admin/registrations": "注册审核",
-        "/admin/admissions": "院校资料管理",
+      "/admin/admissions": "院校资料管理",
       "/history": "历史与偏好授权",
       "/admin/verifications": "学校认证审核",
     }[path] ||

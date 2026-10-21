@@ -257,12 +257,6 @@ export function SchoolCard({
           className="school-identity"
           onClick={() => navigate("/school/" + school.id)}
         >
-          <span
-            className="school-seal"
-            style={{ color: school.color, borderColor: school.color }}
-          >
-            {school.short}
-          </span>
           <span>
             <h3>{school.name}</h3>
             <small>

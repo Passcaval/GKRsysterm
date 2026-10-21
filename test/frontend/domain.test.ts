@@ -24,7 +24,7 @@ const profile: Profile = {
   acceptAdjustment: true,
   consent: true,
 };
-test("星图与用户位置使用同一位次坐标，筛选不会移动参照，边界不会溢出", () => {
+test("位次归一化在固定参照集内结果稳定，并限制输出边界", () => {
   const ranks = [4800, 24500, 28000, 65000];
   assert.ok(rankPosition(4800, ranks) > rankPosition(28000, ranks));
   assert.equal(rankPosition(23500, ranks), rankPosition(23500, [...ranks]));
