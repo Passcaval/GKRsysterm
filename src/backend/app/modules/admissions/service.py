@@ -139,6 +139,27 @@ def enqueue_import(db, settings, actor, payload, admission_config=None):
     return batch
 
 
+def find_school(db, code, name):
+    """Preserve an existing school's identity across provincial and MOE codes."""
+    direct = db.scalar(select(School).where(School.code == code))
+    if direct:
+        return direct
+    identified = list(
+        db.scalars(select(School).where(School.data["catalog_basic"]["identifier"].astext == code))
+    )
+    if not identified:
+        identified = list(
+            db.scalars(
+                select(School).where(
+                    School.data["catalog_basic"].is_not(None), School.data["name"].astext == name
+                )
+            )
+        )
+    if len(identified) > 1:
+        raise DomainError(409, "SCHOOL_IDENTITY_CONFLICT", "院校基础名录身份不唯一，请先人工核对。")
+    return identified[0] if identified else None
+
+
 def process_import(db, batch):
     # Publication is atomic. No partially imported batch can appear in queries.
     payload = ImportInput.model_validate(batch.payload)
@@ -179,7 +200,7 @@ def process_import(db, batch):
         db.add(source)
         db.flush()
     for row in payload.rows:
-        school = db.scalar(select(School).where(School.code == row.school_code))
+        school = find_school(db, row.school_code, row.school_name)
         if not school:
             school = School(
                 code=row.school_code,

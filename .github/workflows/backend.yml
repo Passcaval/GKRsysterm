@@ -2,10 +2,10 @@ name: Backend PostgreSQL checks
 
 on:
   pull_request:
-    paths: ["src/backend/**", "src/frontend/**", "test/**", "docs/contracts/**", "config/**", ".github/workflows/backend.yml"]
+    paths: ["src/backend/**", "src/frontend/**", "test/**", "docs/contracts/**", "config/**", "deploy/**", ".github/workflows/backend.yml"]
   push:
     branches: [main, "feature/**", "fix/**", "test/**"]
-    paths: ["src/backend/**", "src/frontend/**", "test/**", "docs/contracts/**", "config/**", ".github/workflows/backend.yml"]
+    paths: ["src/backend/**", "src/frontend/**", "test/**", "docs/contracts/**", "config/**", "deploy/**", ".github/workflows/backend.yml"]
 
 permissions:
   contents: read

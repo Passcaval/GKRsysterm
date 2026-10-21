@@ -17,6 +17,7 @@ from app.modules.admissions.crawl_service import (
     run_crawl_job,
 )
 from app.modules.admissions.service import process_import
+from app.modules.catalog.service import analyze_job, fetch_job, startup_sync
 from app.modules.recommendation.service import emit, evaluate_snapshot
 
 logger = logging.getLogger("worker")
@@ -46,7 +47,7 @@ def tick(sessions, settings: Settings | None = None, task_types: list[str] | Non
         job = db.scalar(query.order_by(Job.created_at).with_for_update(skip_locked=True).limit(1))
         if not job:
             return False
-        lease_minutes = 5 if job.task_type == "crawl" else 2
+        lease_minutes = 5 if job.task_type in {"crawl", "catalog_fetch", "catalog_analyze"} else 2
         job.status, job.lease_token, job.lease_until = (
             "running",
             token,
@@ -55,6 +56,15 @@ def tick(sessions, settings: Settings | None = None, task_types: list[str] | Non
         job.attempts += 1
         job_id, task_type, object_id = job.id, job.task_type, job.object_id
     try:
+        if task_type in {"catalog_fetch", "catalog_analyze"}:
+            settings = settings or Settings()
+            processor = fetch_job if task_type == "catalog_fetch" else analyze_job
+            processor(sessions, settings, object_id, job_id, token)
+            with sessions.begin() as db:
+                job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
+                if job and job.lease_token == token:
+                    job.status, job.lease_token, job.lease_until = "succeeded", None, None
+            return True
         if task_type == "crawl":
             if settings is None:
                 settings = Settings()
@@ -140,7 +150,7 @@ def main():
     parser.add_argument(
         "--task-types",
         default="",
-        help="Comma-separated job types to consume (import,recommendation,crawl).",
+        help="Comma-separated types (import,recommendation,crawl,catalog_fetch,catalog_analyze).",
     )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
@@ -155,6 +165,11 @@ def main():
     engine = create_engine(settings.database_url, pool_pre_ping=True, hide_parameters=True)
     sessions = sessionmaker(engine, expire_on_commit=False)
     try:
+        if not args.once and (not task_types or "catalog_fetch" in task_types):
+            try:
+                startup_sync(sessions, settings)
+            except Exception:
+                logger.exception("national school catalog startup enqueue failed")
         if not args.once and (not task_types or "crawl" in task_types):
             try:
                 maybe_enqueue_startup_crawl(sessions, settings)

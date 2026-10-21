@@ -29,7 +29,35 @@ def install_contract(app):
                 if method in proposed:
                     operation.update(deepcopy(proposed[method]))
                 else:
+                    if path.startswith("/api/v1/admin/school-catalog"):
+                        operation["security"] = [{"session": []}]
+                        if method not in {"get", "head", "options"}:
+                            operation.setdefault("parameters", []).append(
+                                {
+                                    "in": "header",
+                                    "name": "X-Requested-With",
+                                    "required": True,
+                                    "schema": {"type": "string", "enum": ["NightVoyage"]},
+                                }
+                            )
                     for code in operation["responses"]:
+                        if (
+                            path.startswith("/api/v1/admin/school-catalog")
+                            and code.startswith("2")
+                            and "application/octet-stream"
+                            in operation["responses"][code].get("content", {})
+                        ):
+                            continue
+                        if (
+                            path.startswith("/api/v1/admin/school-catalog")
+                            and code.startswith("2")
+                            and "$ref"
+                            in operation["responses"][code]
+                            .get("content", {})
+                            .get("application/json", {})
+                            .get("schema", {})
+                        ):
+                            continue
                         schema = (
                             {"$ref": "#/components/schemas/Error"}
                             if code.startswith(("4", "5"))

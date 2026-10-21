@@ -14,7 +14,13 @@ python deploy/manage.py init
 python3 deploy/manage.py init
 ```
 
-`init` is the single first-time setup command. It creates `deploy/.env` with fresh secrets, prompts for the OpenAI-compatible model (DeepSeek base URL, model name and API key), builds the images, waits for PostgreSQL, starts all services, applies Alembic migrations, and then prompts for the first administrator (nickname, email, hidden password) if no administrator exists. It also updates the model variables in `src/backend/.env` when that local file exists, so Docker and local runs use the same key. Pressing Enter keeps existing values; leave the API key blank to disable model features.
+`init` creates `deploy/.env`, prompts for the compatible model and builds images. PostgreSQL becomes healthy first, then the one-off `migrate` service completes Alembic migrations; API and both workers wait for migration success. It then prompts for the first administrator if needed. Model variables also update an existing local `src/backend/.env`. Pressing Enter keeps existing values; leaving a previously empty key blank disables model features.
+
+## National school directory (automatic)
+
+The crawl worker automatically stages the complete official national ordinary/adult school directory using `config/school_catalog.json`, independently of existing provincial admissions data. With a configured model, it analyzes every row in batches, then waits for administrator approval at `/#/admin/admissions` (院校资料管理). The administrator can fetch again, retry analysis, inspect original snapshots and before/after differences, choose all changed or selected schools, and approve or reject updates. No school changes are published automatically. Missing model configuration retains downloaded data for later analysis. The same pending run is reused across restarts; review or reject it before starting another.
+
+The default source has an official publication fallback and explicitly configured MOE HTTPS attachment mirror. Both ordinary and adult attachment counts and unique identifiers must match the official announcement. As checked on 2026-10-20, the 2026 list contains 3196 schools and excludes Hong Kong, Macao and Taiwan. Unknown facts remain unknown; national directory coverage does not extend provincial recommendation rules. See [CATALOG.md](../docs/contracts/CATALOG.md).
 
 After the first run, use the non-interactive commands:
 
@@ -45,7 +51,7 @@ MODEL_NAME=deepseek-flash
 
 ## Admission auto-crawl (optional)
 
-Admission sources are read from `config/admission_sources.json` (the Compose file mounts it read-only at `/app/config/`). If `sources` is empty and `discovery.enabled` is true, the `crawl-worker` service automatically starts one crawl after the worker begins, provided the model gateway is configured. Results are staged in `crawl_runs`/`crawl_pages` and must be approved by an administrator in `/#/admin/admissions` or via the admin API; nothing is published automatically.
+Provincial admission sources are read from `config/admission_sources.json`. Its `discovery.auto_start` now defaults to false: start these separate Zhejiang admission crawls explicitly from the same admin page. Enabling auto_start with an empty sources list and configured model retains the original discovery behavior. Provincial results remain staged in crawl_runs/crawl_pages for separate approval.
 
 Leave the model variables empty to disable auto-crawl; manual JSON/CSV import via `/api/v1/admin/imports` remains available. Crawls only fetch allowlisted HTTPS hosts, honor robots.txt, support static HTML/PDF/XLS/XLSX (the real site often mislabels XLS as text/html; magic bytes are checked), and do not execute JavaScript or OCR scanned PDFs. Large spreadsheets are mapped deterministically from header names; missing tuition/subjects remain unknown and city/province placeholders are flagged. A separate `crawl-worker` keeps long crawls from blocking recommendation/import jobs. Review `docs/contracts/BACKEND.md` for the exact API and limitations before enabling it on a public server.
 
