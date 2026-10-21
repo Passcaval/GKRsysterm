@@ -5,9 +5,9 @@
   "exam_category": "普通类",
   "sources": [],
   "discovery": {
-    "enabled": true,
+    "enabled": false,
     "auto_start": false,
-    "entrypoints": ["https://www.zjzs.net/col/col27/index.html"],
+    "entrypoints": [],
     "allowed_hosts": ["www.zjzs.net", "zjzs.net"],
     "allowed_suffixes": [".gov.cn", ".edu.cn"],
     "max_depth": 3,

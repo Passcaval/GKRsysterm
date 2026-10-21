@@ -1,6 +1,6 @@
 # 全国院校基础资料同步与管理员审核
 
-本功能处理教育部公布的全国高等学校完整名录，包含普通和成人高校，不依赖浙江招生计划是否存在。教育部该名单未包含港澳台高校。基础字段为学校名称、10位学校标识码、主管部门、省份、所在地（原件未提供时“待核对”）、办学层次、普通/成人类别和备注；不据此生成专业、排名、学费或录取判断。分省招生计划继续由原招生模块独立管理。
+本功能处理教育部公布的全国高等学校完整名录，包含普通和成人高校，不依赖浙江招生计划是否存在。教育部该名单未包含港澳台高校。基础字段为学校名称、10位学校标识码、主管部门、省份、所在地（原件未提供时“待核对”）、办学层次、普通/成人类别和备注；不据此生成专业、排名、学费或录取判断。分省招生计划继续由原招生模块独立管理。已发布名录也作为领航员在没有招生计划时的回退来源，只按地区/层次列出学校名称、所在地和办学层次，不用于判断专业或录取可能。
 
 ## 部署与自动抓取
 
@@ -8,7 +8,7 @@
 
 Compose 的 migrate 一次性服务先执行 Alembic upgrade head，API、普通Worker和抓取Worker等待其成功后启动，避免全新数据库启动时任务表不存在。crawl-worker 消费 crawl、catalog_fetch、catalog_analyze；普通Worker处理原导入和推荐。部署命令仍为 `python deploy/manage.py init`，升级为 `python deploy/manage.py up`。本次新增迁移 `c3e4f5a6b7d8`，保留全部既有迁移。
 
-全国名录会先抓取并暂存完整原件。配置了MODEL_BASE_URL/MODEL_API_KEY/MODEL_NAME时自动逐批进行AI分析；没有模型时保留抓取结果为analysis_pending，管理端提示配置模型后重新分析，禁止直接发布。`config/admission_sources.json` 中旧浙江抓取的auto_start默认改为false，可由管理员另行触发，避免把局部招生抓取当作全国资料初始化。
+全国名录会先抓取并暂存完整原件。配置了MODEL_BASE_URL/MODEL_API_KEY/MODEL_NAME时自动逐批进行AI分析；没有模型时保留抓取结果为analysis_pending，管理端提示配置模型后重新分析，禁止直接发布。`config/admission_sources.json` 中省级招生计划抓取默认关闭（`discovery.enabled=false`、`auto_start=false`），生产管理页只显示全国院校资料；如确需浙江招生计划，须显式启用后再由管理员触发，避免把局部招生抓取当作全国资料初始化。
 
 ## 来源与完整性
 
@@ -20,7 +20,7 @@ Compose 的 migrate 一次性服务先执行 Alembic upgrade head，API、普通
 
 ## AI分析与人工更新
 
-状态：queued → fetching → analysis_pending/analyzing → awaiting_review → published/rejected；来源失败进入failed。逐批分析默认100所，全部候选都提交分析，按批保存进度和模型用量；未完成全量分析不可批准。AI只返回summary/warnings，不允许生成或修改官方院校字段。失败保留原件与资料，可重新分析，无须重新下载；每次分析任务使用新的版本，支持连续重试。
+状态：queued → fetching → analysis_pending/analyzing → awaiting_review → published/rejected；来源失败进入failed。逐批分析默认100所，全部候选都提交分析，按批保存进度和模型用量；未完成全量分析不可批准。`analysis_max_tokens` 默认8000，避免推理模型把输出预算消耗在推理内容上后返回空JSON；若模型仍返回截断或无效JSON，后端会自动把该批二分（最小25所）后重试，并保留各子批审核意见。AI只返回summary/warnings，不允许生成或修改官方院校字段。失败保留原件与资料，可重新分析，无须重新下载；每次分析任务使用新的版本，支持连续重试。
 
 按学校标识码匹配正式记录；已有省级代码时只在名称唯一且身份不冲突时关联原ID。反向顺序也受支持：先发布全国名录、后导入省级招生资料时，正式导入和抓取审核预检共用身份解析，复用同一学校ID。歧义和多个候选记为conflict，不自动合并。管理端显示新增、变更、未变化及冲突数量，支持搜索、筛选、分页、逐字段前后对比、AI意见和原始快照。管理员必须填写审核说明、确认核对材料，再选择更新全部新增/变更或仅勾选院校；也可拒绝本次更新。
 

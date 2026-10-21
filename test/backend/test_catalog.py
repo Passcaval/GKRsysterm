@@ -10,6 +10,7 @@ from openpyxl import Workbook
 from sqlalchemy import func, select
 
 from app.core.errors import DomainError
+from app.core.model import ModelOutputInvalid
 from app.db.models import Job, School, SchoolCatalogRevision
 from app.modules.catalog import service, source
 from app.modules.catalog.source import CatalogConfig, digest, fetch_catalog, parse_workbook
@@ -302,6 +303,31 @@ def test_ai_failure_can_be_reanalyzed_without_refetch(catalog, app, monkeypatch)
     assert response.status_code == 202
     tick(app.state.sessions, settings, ["catalog_analyze"])
     assert detail(client, run_id)["status"] == "awaiting_review"
+
+
+def test_truncated_ai_json_splits_batch_instead_of_blocking_review(catalog, app, monkeypatch):
+    client, settings, _, _ = catalog
+    config = source.load_config(settings).model_copy(
+        update={"analysis_batch_size": 2, "analysis_max_tokens": 8000}
+    )
+    settings.school_catalog_file.write_text(config.model_dump_json(), encoding="utf-8")
+
+    class SplittingAI(FakeAI):
+        def complete_json(self, system, user, **kwargs):
+            payload = json.loads(user)
+            if len(payload["rows"]) > 1:
+                raise ModelOutputInvalid("model did not return a JSON object")
+            return super().complete_json(system, user, **kwargs)
+
+    monkeypatch.setattr(service, "ModelGateway", lambda *_: SplittingAI())
+    monkeypatch.setattr(service, "MIN_SPLIT_BATCH", 1)
+    run_id = trigger(client)
+    assert tick(app.state.sessions, settings, ["catalog_fetch"])
+    value = detail(client, run_id)
+    assert value["status"] == "awaiting_review"
+    assert value["analysis"]["rows_analyzed"] == 2
+    assert len(value["analysis"]["batches"]) == 2
+    assert {batch["count"] for batch in value["analysis"]["batches"]} == {1}
 
 
 def test_full_directory_analysis_pagination_and_publication(catalog, app):

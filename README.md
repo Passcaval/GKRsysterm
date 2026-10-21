@@ -32,11 +32,11 @@ pnpm run dev
 - [后端实际接口、数据字典和前端差异](docs/contracts/BACKEND.md)
 - [生成的完整后端 OpenAPI](docs/contracts/backend-openapi.json)
 
-真实 PostgreSQL、并发事务、当前 v0.4 前端访问层及浏览器登录权限已有联调测试，测试使用合成资料。领航员内填写省份、报考年份、位次、三门选科并同意使用画像后，即可直接查看规则推荐；分数、意向省份/城市、院校、专业与预算均可稍后补充。用户确认新信息后生成新画像版本，并在领航员里更新推荐，原任务与快照保留。普通问答接入 OpenAI 兼容模型（DeepSeek），检索已发布资料并流式回答，模型回答与经过校验的推荐结果分别展示。生源省份与想去的省份分开处理，聊天不会静默改写画像。详细流程、字段映射及部署抓取条件见[领航员对接说明](docs/contracts/NAVIGATOR.md)。工具型 Agent、向量检索、学校认证审核、长期记忆和案例共享等 M2–M4 功能仍未完成。
+真实 PostgreSQL、并发事务、当前 v0.4 前端访问层及浏览器登录权限已有联调测试，测试使用合成资料。领航员内填写省份、报考年份、位次、三门选科并同意使用画像后，即可直接查看规则推荐；分数、意向省份/城市、院校、专业与预算均可稍后补充。用户确认新信息后生成新画像版本，并在领航员里更新推荐，原任务与快照保留。普通问答接入 OpenAI 兼容模型（DeepSeek），检索已发布招生计划并流式回答；没有招生计划时回退到全国院校名录，只按地区/层次列学校，不判断分数或专业。模型回答与经过校验的推荐结果分别展示。生源省份与想去的省份分开处理，聊天不会静默改写画像。详细流程、字段映射及部署抓取条件见[领航员对接说明](docs/contracts/NAVIGATOR.md)。工具型 Agent、向量检索、学校认证审核、长期记忆和案例共享等 M2–M4 功能仍未完成。
 
 ## 招生数据自动抓取
 
-招生来源集中在 [`config/admission_sources.json`](config/admission_sources.json)，API 和 Worker 启动时读取同一份配置。`sources` 为空且 `discovery.enabled=true` 时，`crawl-worker` 启动后会自动抓取一次配置的官方入口并在允许域名内跟随链接；`sources` 非空时由管理员在 `/#/admin/admissions`（或 `POST /api/v1/admin/admissions/crawl`）触发。
+招生来源集中在 [`config/admission_sources.json`](config/admission_sources.json)，但当前默认关闭省级招生计划抓取（`discovery.enabled=false`、`auto_start=false`）。项目只自动同步全国院校基础资料，管理页默认只显示全国名录；浙江招生计划抓取仅在显式启用该配置后由管理员触发，结果仍需审核。
 
 模型使用 OpenAI 兼容接口，密钥只放在 `deploy/.env`/`src/backend/.env`：
 

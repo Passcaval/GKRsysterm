@@ -67,13 +67,28 @@ export default function AdmissionsAdmin() {
   const [rowsOverride, setRowsOverride] = useState("");
   const reviewKey = useRef({ body: "", key: "" });
 
+  const provinceCrawlEnabled = Boolean(
+    sources?.config &&
+      (sources.config.discovery.enabled ||
+        sources.config.sources.some((source) => source.enabled)),
+  );
+
   useEffect(() => {
     if (!allowed || isMock) return;
     let active = true;
-    Promise.all([api.admissionSources(), api.crawlRuns()])
-      .then(([config, page]) => {
+    api
+      .admissionSources()
+      .then(async (config) => {
         if (!active) return;
         setSources(config);
+        const enabled = Boolean(
+          config.config &&
+            (config.config.discovery.enabled ||
+              config.config.sources.some((source) => source.enabled)),
+        );
+        if (!enabled) return;
+        const page = await api.crawlRuns();
+        if (!active) return;
         setRuns(page.items);
         setCursor(page.nextCursor);
       })
@@ -223,6 +238,29 @@ export default function AdmissionsAdmin() {
         </p>
       </section>
     );
+
+  if (!provinceCrawlEnabled) {
+    return (
+      <section className="panel" aria-labelledby="data-management-title">
+        <h1 id="data-management-title">院校资料管理</h1>
+        <CatalogAdmin />
+        <p className="muted">
+          当前只启用全国院校基础资料同步。浙江招生计划抓取已在
+          config/admission_sources.json 中关闭。
+        </p>
+        {sources?.configError && (
+          <p className="warning-text" role="alert">
+            招生源配置错误：{sources.configError}
+          </p>
+        )}
+        {error && (
+          <p className="warning-text" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className="panel" aria-labelledby="data-management-title">

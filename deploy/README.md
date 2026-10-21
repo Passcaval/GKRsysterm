@@ -51,7 +51,7 @@ MODEL_NAME=deepseek-flash
 
 ## Admission auto-crawl (optional)
 
-Provincial admission sources are read from `config/admission_sources.json`. Its `discovery.auto_start` now defaults to false: start these separate Zhejiang admission crawls explicitly from the same admin page. Enabling auto_start with an empty sources list and configured model retains the original discovery behavior. Provincial results remain staged in crawl_runs/crawl_pages for separate approval.
+Provincial admission sources are read from `config/admission_sources.json`. Provincial crawling is disabled by default (`discovery.enabled=false`, `discovery.auto_start=false`): the deployment syncs only the national school directory. If Zhejiang admission plans are needed, explicitly enable discovery and trigger the crawl from the admin page. Provincial results remain staged in crawl_runs/crawl_pages for separate approval.
 
 Leave the model variables empty to disable auto-crawl; manual JSON/CSV import via `/api/v1/admin/imports` remains available. Crawls only fetch allowlisted HTTPS hosts, honor robots.txt, support static HTML/PDF/XLS/XLSX (the real site often mislabels XLS as text/html; magic bytes are checked), and do not execute JavaScript or OCR scanned PDFs. Large spreadsheets are mapped deterministically from header names; missing tuition/subjects remain unknown and city/province placeholders are flagged. A separate `crawl-worker` keeps long crawls from blocking recommendation/import jobs. Review `docs/contracts/BACKEND.md` for the exact API and limitations before enabling it on a public server.
 
