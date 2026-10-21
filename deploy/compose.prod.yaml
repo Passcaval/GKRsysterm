@@ -14,6 +14,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+  migrate:
+    build:
+      context: ..
+      dockerfile: src/backend/Dockerfile
+    command: ["python", "-m", "alembic", "upgrade", "head"]
+    env_file: .env
+    depends_on:
+      postgres: { condition: service_healthy }
   api:
     build:
       context: ..
@@ -24,6 +32,7 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
     depends_on:
       postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
     volumes:
       - private_storage:/app/runtime/private
       - ../config:/app/config:ro
@@ -38,6 +47,7 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
     depends_on:
       postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
     volumes:
       - private_storage:/app/runtime/private
       - ../config:/app/config:ro
@@ -46,12 +56,13 @@ services:
       context: ..
       dockerfile: src/backend/Dockerfile
     restart: unless-stopped
-    command: ["python", "-m", "app.workers.runner", "--task-types", "crawl"]
+    command: ["python", "-m", "app.workers.runner", "--task-types", "crawl,catalog_fetch,catalog_analyze"]
     env_file: .env
     environment:
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
     depends_on:
       postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
     volumes:
       - private_storage:/app/runtime/private
       - ../config:/app/config:ro

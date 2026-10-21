@@ -119,7 +119,7 @@ function App() {
       "/register": "注册申请",
       "/application": "申请状态",
       "/admin/registrations": "注册审核",
-      "/admin/admissions": "招生数据抓取",
+        "/admin/admissions": "院校资料管理",
       "/history": "历史与偏好授权",
       "/admin/verifications": "学校认证审核",
     }[path] ||
@@ -248,7 +248,7 @@ function App() {
           {hasPermission(data.user, "admissions:import") && (
             <button onClick={() => navigate("/admin/admissions")}>
               <Database size={18} />
-              <span>招生数据抓取</span>
+              <span>院校资料管理</span>
             </button>
           )}
           <div className="sidebar-note">

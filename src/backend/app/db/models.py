@@ -157,6 +157,40 @@ class School(Base):
     data: Mapped[dict] = mapped_column(JSONB)
 
 
+class SchoolCatalogRun(Entity, Base):
+    __tablename__ = "school_catalog_runs"
+    trigger_type: Mapped[str] = mapped_column(String(16))
+    triggered_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(24), default="queued")
+    version: Mapped[int] = mapped_column(default=1)
+    config_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    config_snapshot: Mapped[dict] = mapped_column(JSONB)
+    snapshot: Mapped[dict] = mapped_column(JSONB, default=dict)
+    changes: Mapped[list] = mapped_column(JSONB, default=list)
+    analysis: Mapped[dict] = mapped_column(JSONB, default=dict)
+    error: Mapped[str | None] = mapped_column(String(500))
+    reviewed_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review: Mapped[dict] = mapped_column(JSONB, default=dict)
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('queued','fetching','analysis_pending','analyzing',"
+            "'awaiting_review','published','rejected','failed')"
+        ),
+    )
+
+
+class SchoolCatalogRevision(Entity, Base):
+    __tablename__ = "school_catalog_revisions"
+    school_id: Mapped[UUID] = mapped_column(ForeignKey("schools.id"), index=True)
+    run_id: Mapped[UUID] = mapped_column(ForeignKey("school_catalog_runs.id"))
+    source_id: Mapped[UUID] = mapped_column(ForeignKey("source_versions.id"))
+    identifier: Mapped[str] = mapped_column(String(10))
+    before: Mapped[dict] = mapped_column(JSONB)
+    after: Mapped[dict] = mapped_column(JSONB)
+    __table_args__ = (UniqueConstraint("run_id", "identifier"),)
+
+
 class AdmissionUnit(Entity, Base):
     __tablename__ = "admission_units"
     school_id: Mapped[UUID] = mapped_column(ForeignKey("schools.id"), index=True)

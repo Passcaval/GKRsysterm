@@ -10518,6 +10518,855 @@
           }
         }
       }
+    },
+    "/api/v1/admin/school-catalog/config": {
+      "get": {
+        "tags": [
+          "national school catalog"
+        ],
+        "summary": "Config",
+        "operationId": "config_api_v1_admin_school_catalog_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ConfigView_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/school-catalog/runs": {
+      "get": {
+        "tags": [
+          "national school catalog"
+        ],
+        "summary": "Runs",
+        "operationId": "runs_api_v1_admin_school_catalog_runs_get",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_Page_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "national school catalog"
+        ],
+        "summary": "Trigger",
+        "operationId": "trigger_api_v1_admin_school_catalog_runs_post",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Requested-With",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NightVoyage"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_Summary_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/school-catalog/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "national school catalog"
+        ],
+        "summary": "Detail",
+        "operationId": "detail_api_v1_admin_school_catalog_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "all",
+                "new",
+                "changed",
+                "unchanged",
+                "conflict"
+              ],
+              "type": "string",
+              "default": "all",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_Detail_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/school-catalog/runs/{run_id}/snapshots/{index}": {
+      "get": {
+        "tags": [
+          "national school catalog"
+        ],
+        "summary": "Raw",
+        "operationId": "raw_api_v1_admin_school_catalog_runs__run_id__snapshots__index__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "官方名录原始快照",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/school-catalog/runs/{run_id}/analyze": {
+      "post": {
+        "tags": [
+          "national school catalog"
+        ],
+        "summary": "Analyze",
+        "operationId": "analyze_api_v1_admin_school_catalog_runs__run_id__analyze_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Requested-With",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NightVoyage"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Expected"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_Summary_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/school-catalog/runs/{run_id}/review": {
+      "post": {
+        "tags": [
+          "national school catalog"
+        ],
+        "summary": "Review",
+        "operationId": "review_api_v1_admin_school_catalog_runs__run_id__review_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Requested-With",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NightVoyage"
+              ]
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Review"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_Summary_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -10692,6 +11541,229 @@
         ],
         "title": "AdmissionRow"
       },
+      "Analysis": {
+        "properties": {
+          "rows_analyzed": {
+            "type": "integer",
+            "title": "Rows Analyzed",
+            "default": 0
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "batches": {
+            "items": {
+              "$ref": "#/components/schemas/Batch"
+            },
+            "type": "array",
+            "title": "Batches"
+          },
+          "usage": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Usage"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "title": "Analysis"
+      },
+      "Batch": {
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "offset",
+          "count",
+          "summary",
+          "warnings"
+        ],
+        "title": "Batch"
+      },
+      "Change": {
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "title": "Identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "new",
+              "changed",
+              "unchanged",
+              "conflict"
+            ],
+            "title": "Kind"
+          },
+          "before": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Before"
+          },
+          "after": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "After"
+          },
+          "school_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "School Id"
+          },
+          "baseline_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "identifier",
+          "name",
+          "kind",
+          "before",
+          "after",
+          "school_id",
+          "baseline_hash"
+        ],
+        "title": "Change"
+      },
+      "ChangeCounts": {
+        "properties": {
+          "new": {
+            "type": "integer",
+            "title": "New"
+          },
+          "changed": {
+            "type": "integer",
+            "title": "Changed"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "conflict": {
+            "type": "integer",
+            "title": "Conflict"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new",
+          "changed",
+          "unchanged",
+          "conflict"
+        ],
+        "title": "ChangeCounts"
+      },
+      "ConfigView": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "auto_start": {
+            "type": "boolean",
+            "title": "Auto Start"
+          },
+          "model_configured": {
+            "type": "boolean",
+            "title": "Model Configured"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "publication_url": {
+            "type": "string",
+            "title": "Publication Url"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "config_fingerprint": {
+            "type": "string",
+            "title": "Config Fingerprint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "auto_start",
+          "model_configured",
+          "model_name",
+          "publication_url",
+          "scope",
+          "config_fingerprint"
+        ],
+        "title": "ConfigView"
+      },
       "CrawlReviewInput": {
         "properties": {
           "decision": {
@@ -10786,6 +11858,198 @@
           "expected_version"
         ],
         "additionalProperties": false
+      },
+      "Detail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "fetching",
+              "analysis_pending",
+              "analyzing",
+              "awaiting_review",
+              "published",
+              "rejected",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "trigger_type": {
+            "type": "string",
+            "title": "Trigger Type"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ChangeCounts"
+          },
+          "official_counts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfficialCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "review": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Review"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/Snapshot"
+          },
+          "analysis": {
+            "$ref": "#/components/schemas/Analysis"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "version",
+          "trigger_type",
+          "created_at",
+          "counts",
+          "official_counts",
+          "error",
+          "review",
+          "snapshot",
+          "analysis",
+          "changes",
+          "total",
+          "next_offset"
+        ],
+        "title": "Detail"
+      },
+      "Envelope_ConfigView_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ConfigView"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "Envelope[ConfigView]"
+      },
+      "Envelope_Detail_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Detail"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "Envelope[Detail]"
+      },
+      "Envelope_Page_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Page"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "Envelope[Page]"
+      },
+      "Envelope_Summary_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Summary"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data",
+          "request_id"
+        ],
+        "title": "Envelope[Summary]"
+      },
+      "Expected": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version"
+        ],
+        "title": "Expected"
       },
       "HTTPValidationError": {
         "properties": {
@@ -11049,6 +12313,57 @@
         ],
         "additionalProperties": false
       },
+      "OfficialCounts": {
+        "properties": {
+          "ordinary": {
+            "type": "integer",
+            "title": "Ordinary"
+          },
+          "adult": {
+            "type": "integer",
+            "title": "Adult"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ordinary",
+          "adult",
+          "total"
+        ],
+        "title": "OfficialCounts"
+      },
+      "Page": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Summary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "next_offset"
+        ],
+        "title": "Page"
+      },
       "PostFeedbackInput": {
         "properties": {
           "kind": {
@@ -11074,6 +12389,80 @@
         ],
         "title": "PostFeedbackInput"
       },
+      "RawSnapshot": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "label",
+          "content_hash"
+        ],
+        "title": "RawSnapshot"
+      },
+      "Review": {
+        "properties": {
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Expected Version"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "reject"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "identifiers": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identifiers"
+          },
+          "acknowledge_analysis": {
+            "type": "boolean",
+            "title": "Acknowledge Analysis",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_version",
+          "decision",
+          "reason"
+        ],
+        "title": "Review"
+      },
       "SignalDecision": {
         "properties": {
           "decision": {
@@ -11097,6 +12486,160 @@
           "expected_version"
         ],
         "title": "SignalDecision"
+      },
+      "Snapshot": {
+        "properties": {
+          "counts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfficialCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "publication_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publication Url"
+          },
+          "scope_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Note"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/RawSnapshot"
+            },
+            "type": "array",
+            "title": "Snapshots"
+          }
+        },
+        "type": "object",
+        "title": "Snapshot"
+      },
+      "Summary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "fetching",
+              "analysis_pending",
+              "analyzing",
+              "awaiting_review",
+              "published",
+              "rejected",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "trigger_type": {
+            "type": "string",
+            "title": "Trigger Type"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ChangeCounts"
+          },
+          "official_counts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OfficialCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "review": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Review"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "version",
+          "trigger_type",
+          "created_at",
+          "counts",
+          "official_counts",
+          "error",
+          "review"
+        ],
+        "title": "Summary"
       },
       "ValidationError": {
         "properties": {

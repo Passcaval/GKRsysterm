@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import CatalogAdmin from "./CatalogAdmin";
 import { api, isMock } from "../api";
 import { Empty } from "../components";
 import { useApp } from "../store";
@@ -210,7 +211,8 @@ export default function AdmissionsAdmin() {
     }
   }
 
-  if (!allowed) return <Empty text="需要招生数据管理权限（admissions:import）。" />;
+  if (!allowed)
+    return <Empty text="需要招生数据管理权限（admissions:import）。" />;
   if (isMock)
     return (
       <section className="panel">
@@ -223,15 +225,21 @@ export default function AdmissionsAdmin() {
     );
 
   return (
-    <section className="panel" aria-labelledby="crawl-title">
+    <section className="panel" aria-labelledby="data-management-title">
+      <h1 id="data-management-title">院校资料管理</h1>
+      <CatalogAdmin />
       <div className="section-title">
         <div>
-          <h1 id="crawl-title">招生数据抓取</h1>
+          <h2 id="crawl-title">浙江招生计划抓取</h2>
           <p className="muted">
             后端抓取官方页面，模型筛选链接并抽取字段；结果必须由管理员审核后才会发布。
           </p>
         </div>
-        <button className="button gold-button" disabled={busy} onClick={() => void trigger()}>
+        <button
+          className="button gold-button"
+          disabled={busy}
+          onClick={() => void trigger()}
+        >
           触发一次抓取
         </button>
       </div>
@@ -386,10 +394,12 @@ export default function AdmissionsAdmin() {
               </h4>
               <p className="muted">{page.url}</p>
               <p>
-                HTTP {page.httpStatus ?? "—"} · {page.contentType || "未知类型"} ·{" "}
-                {page.textChars} 字符 · {page.rowCount} 行
+                HTTP {page.httpStatus ?? "—"} · {page.contentType || "未知类型"}{" "}
+                · {page.textChars} 字符 · {page.rowCount} 行
               </p>
-              {page.publishedAt && <p>官方发布时间：{beijingTime(page.publishedAt)}</p>}
+              {page.publishedAt && (
+                <p>官方发布时间：{beijingTime(page.publishedAt)}</p>
+              )}
               {page.error && <p className="warning-text">{page.error}</p>}
               {page.hasSnapshot && (
                 <button
@@ -412,8 +422,10 @@ export default function AdmissionsAdmin() {
               className={`unit-row ${row.validation.status}`}
             >
               <h4>
-                {String(row.data.schoolName || row.data.schoolCode || "未知院校")} ·{" "}
-                {String(row.data.major || "未知专业")}
+                {String(
+                  row.data.schoolName || row.data.schoolCode || "未知院校",
+                )}{" "}
+                · {String(row.data.major || "未知专业")}
               </h4>
               <p>
                 招生单位 {String(row.data.unitCode || "—")} · 代码{" "}
@@ -495,7 +507,11 @@ export default function AdmissionsAdmin() {
                   placeholder='{"<page_id>": [{"school_code":"...", ...}]}'
                 />
               </label>
-              <button className="button gold-button" disabled={busy} type="submit">
+              <button
+                className="button gold-button"
+                disabled={busy}
+                type="submit"
+              >
                 {busy ? "提交中…" : "提交审核"}
               </button>
             </form>

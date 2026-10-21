@@ -27,7 +27,7 @@ def test_real_frontend_adapter_over_http(app, student, published):
 
     def worker():
         while not stopped.is_set():
-            tick(production_app.state.sessions)
+            tick(production_app.state.sessions, production_app.state.settings)
             stopped.wait(0.05)
 
     worker_thread = threading.Thread(target=worker, daemon=True)

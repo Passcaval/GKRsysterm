@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "auto_start": true,
+  "index_url": "https://www.moe.gov.cn/jyb_xxgk/xxgk/neirong/fenlei/sxml_gdjy/gdjy_gxsz/gxsz_xxmd/",
+  "publication_url": "https://www.moe.gov.cn/jyb_xxgk/s5743/s5744/202606/t20260618_1441074.html",
+  "fallback_publication_urls": ["https://dxs.moe.gov.cn/zx/a/sy_xzsd/260618/2045120.shtml"],
+  "allowed_hosts": ["www.moe.gov.cn", "moe.gov.cn", "hudong.moe.gov.cn", "dxs.moe.gov.cn"],
+  "attachment_mirrors": {"www.moe.gov.cn": ["hudong.moe.gov.cn"]},
+  "minimum_counts": {"ordinary": 2500, "adult": 150},
+  "max_bytes": 16777216,
+  "timeout_seconds": 30,
+  "analysis_batch_size": 100
+}

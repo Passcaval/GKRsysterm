@@ -17,6 +17,13 @@ PASSWORD = "Test-only Strong Pass!"
 HEADERS = {"Origin": "http://testserver", "X-Requested-With": "NightVoyage"}
 
 
+@pytest.fixture(autouse=True)
+def isolate_test_proxy(monkeypatch):
+    """Loopback fixtures must never use a developer's external proxy."""
+    for key in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        monkeypatch.delenv(key, raising=False)
+
+
 @pytest.fixture(scope="session")
 def database_url():
     url = os.environ.get("TEST_DATABASE_URL")

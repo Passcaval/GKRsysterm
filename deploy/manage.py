@@ -311,7 +311,6 @@ def deploy() -> None:
     validate_env()
     docker_compose("config", "--quiet")
     docker_compose("up", "--detach", "--build", "--wait")
-    docker_compose("exec", "-T", "api", "python", "-m", "alembic", "upgrade", "head")
     print("Deployment is ready.")
     print("Open http://localhost:" + read_env().get("HTTP_PORT", "8080"))
 
