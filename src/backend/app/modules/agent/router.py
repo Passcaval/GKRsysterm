@@ -23,7 +23,9 @@ from app.modules.agent.service import (
     add_message,
     build_context,
     build_messages,
+    build_school_context,
     history_for,
+    retrieve_schools,
     retrieve_units,
     search_terms,
     target_values,
@@ -81,9 +83,18 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
         target_rank=target_rank,
         profile=profile,
     )
+    school_rows = retrieve_schools(db, terms, profile, data.message) if not rows else []
     context, source_ids = build_context(rows)
+    school_context, school_source_ids = build_school_context(school_rows)
+    source_ids = list(dict.fromkeys([*source_ids, *school_source_ids]))
     history = history_for(db, conversation.id)
-    messages = build_messages(profile, context, history, data.message)
+    messages = build_messages(
+        profile,
+        context,
+        history,
+        data.message,
+        school_context=school_context,
+    )
     user_message = add_message(db, conversation.id, user.id, "user", data.message)
     db.flush()
     changes = extract_profile_changes(profile, data.message) if profile_record else []
@@ -117,7 +128,7 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
                 {
                     "type": "tool_start",
                     "tool": "official_search",
-                    "text": "检索已发布的招生数据",
+                    "text": "检索招生计划和全国院校名录",
                 }
             )
             if rows:
@@ -128,12 +139,23 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
                         "text": f"匹配到 {len(rows)} 条招生数据、{len(source_ids)} 条来源",
                     }
                 )
+            elif school_rows:
+                yield _event(
+                    {
+                        "type": "tool_end",
+                        "tool": "official_search",
+                        "text": (
+                            f"未匹配到招生计划，找到 {len(school_rows)} 所全国院校；"
+                            "仅含学校基础名录，不含专业和投档数据"
+                        ),
+                    }
+                )
             else:
                 yield _event(
                     {
                         "type": "tool_end",
                         "tool": "official_search",
-                        "text": "未匹配到具体招生数据，将按一般信息回答",
+                        "text": "未匹配到招生计划或全国院校名录数据",
                     }
                 )
             if source_ids:

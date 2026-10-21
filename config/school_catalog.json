@@ -9,5 +9,6 @@
   "minimum_counts": {"ordinary": 2500, "adult": 150},
   "max_bytes": 16777216,
   "timeout_seconds": 30,
-  "analysis_batch_size": 100
+  "analysis_batch_size": 100,
+  "analysis_max_tokens": 8000
 }

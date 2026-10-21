@@ -119,3 +119,11 @@ def test_wire_dto_round_trips_optional_schools_and_null_score():
     assert recommendation_missing(value.model_dump()) == []
     prompt = build_messages(value.model_dump(), "合成资料", [], "先推荐几个方向")[0]["content"]
     assert "分数、意向省份/城市、意向院校、专业及预算均可后补" in prompt
+
+
+def test_chat_prompt_prefers_conversation_over_template_sections():
+    prompt = build_messages(None, "合成资料", [], "你好")[0]["content"]
+    assert "不要用“先给结论”“下一步建议”" in prompt
+    assert "也不要给自己加小标题" in prompt
+    assert "最多只问一个最关键的问题" in prompt
+    assert "不要每段都列点" in prompt

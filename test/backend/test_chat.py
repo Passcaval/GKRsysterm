@@ -7,7 +7,7 @@ from conftest import HEADERS, PASSWORD
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app.db.models import ConversationMessage
+from app.db.models import ConversationMessage, School
 from app.main import create_app
 
 
@@ -112,6 +112,51 @@ def test_chat_streams_retrieves_and_persists(app, modern_chat, published):
     assert roles == ["system", "user", "assistant", "user"]
     assert history[1]["content"] == "适合我的计算机院校有哪些？"
     assert history[3]["content"] == "那杭州呢？"
+
+
+def test_chat_falls_back_to_national_directory_when_no_admission_units(app, modern_chat):
+    client, factory = modern_chat
+    with app.state.sessions() as db:
+        db.add(
+            School(
+                code="4131010248",
+                data={
+                    "name": "合成目录大学",
+                    "province": "江苏省",
+                    "city": "南京市",
+                    "source_ids": ["catalog-source"],
+                    "catalog_as_of": "2026-06-17",
+                    "catalog_version": "catalog-run",
+                    "catalog_basic": {
+                        "name": "合成目录大学",
+                        "identifier": "4131010248",
+                        "province": "江苏省",
+                        "city": "南京市",
+                        "education_level": "本科",
+                        "department": "教育部",
+                        "category": "ordinary",
+                        "remarks": "",
+                    },
+                },
+            )
+        )
+        db.commit()
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"message": "南京有哪些大学？"},
+    )
+    assert response.status_code == 200, response.text
+    payloads = events(response)
+    tool_end = next(item for item in payloads if item["type"] == "tool_end")
+    assert "全国院校" in tool_end["text"]
+    evidence = next(item for item in payloads if item["type"] == "evidence")
+    assert "catalog-source" in evidence["source_ids"]
+
+    system = factory.gateways[0].messages[0]["content"]
+    assert "合成目录大学" in system
+    assert "<school_directory>" in system
+    assert "不含专业和投档数据" in system
 
 
 def test_chat_without_model_is_a_clear_503(student):

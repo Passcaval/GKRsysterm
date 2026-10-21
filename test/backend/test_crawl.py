@@ -381,6 +381,20 @@ def test_startup_skips_without_model(app, site):
         assert not list(db.scalars(select(CrawlRun)))
 
 
+def test_startup_skips_when_discovery_is_disabled(app, site):
+    config = make_config(site, sources=False, auto_start=True)
+    config = config.model_copy(
+        update={"discovery": config.discovery.model_copy(update={"enabled": False})}
+    )
+    settings = app.state.settings.model_copy(deep=True)
+    settings.model_base_url = "https://model.example/v1"
+    settings.model_api_key = "test-key"
+    settings.model_name = "test-model"
+    assert maybe_enqueue_startup_crawl(app.state.sessions, settings, config) is None
+    with app.state.sessions() as db:
+        assert not list(db.scalars(select(CrawlRun)))
+
+
 def test_config_normalization_and_scope():
     config = AdmissionSourceConfig.model_validate(
         {

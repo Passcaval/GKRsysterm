@@ -30,6 +30,9 @@ class CatalogConfig(BaseModel):
     max_bytes: int = Field(default=16 * 1024 * 1024, ge=1024, le=20 * 1024 * 1024)
     timeout_seconds: int = Field(default=30, ge=1, le=120)
     analysis_batch_size: int = Field(default=100, ge=1, le=100)
+    # Reasoning models can spend most of a small output budget before returning
+    # the JSON answer; 8k keeps a 100-row batch from ending with empty content.
+    analysis_max_tokens: int = Field(default=8000, ge=1024, le=32000)
 
     @property
     def fingerprint(self):

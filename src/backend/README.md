@@ -49,9 +49,9 @@ pnpm run dev
 
 ## 招生数据自动抓取
 
-来源与抓取策略来自仓库根目录 `config/admission_sources.json`，API/Worker 启动时读取；修改后重启对应进程。手工导入仍是兜底。
+来源与抓取策略来自仓库根目录 `config/admission_sources.json`，API/Worker 启动时读取；修改后重启对应进程。当前配置默认关闭省级招生计划抓取（`discovery.enabled=false`），只同步全国院校基础资料；手工导入仍是兜底。
 
-- 自动触发：`sources` 为空、`discovery.auto_start=true`、模型已配置、数据库无 active 招生单位且没有同配置指纹的抓取运行时，Worker 启动后创建一次 `crawl` 任务。
+- 自动触发（仅在显式启用 `discovery.enabled=true` 后）：`sources` 为空、`discovery.auto_start=true`、模型已配置、数据库无 active 招生单位且没有同配置指纹的抓取运行时，Worker 启动后创建一次 `crawl` 任务。
 - 手动触发：`POST /api/v1/admin/admissions/crawl`（需管理员会话与 Idempotency-Key），或 `python -m app.cli crawl`。
 - 模型环境变量：`MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME`；可选 `MODEL_TIMEOUT_SECONDS`、`MODEL_MAX_OUTPUT_TOKENS`。`MODEL_BASE_URL` 应包含供应商要求的 API 前缀（例如 `https://api.deepseek.com/v1`），网关会追加 `/chat/completions`。密钥只从环境变量读取。
 - Worker 任务类型：默认 worker 处理 `import,recommendation`，Compose 另起 `crawl-worker` 处理 `crawl`；也可用 `python -m app.workers.runner --task-types crawl` 单跑。`--once` 不自动入队。
@@ -60,7 +60,7 @@ pnpm run dev
 
 ## AI 领航员聊天
 
-`POST /api/v1/chat/stream` 已接入 OpenAI 兼容的流式模型（与招生抓取共用 `MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME`）。它只检索已发布、已审核的 `admission_units`，把用户最新画像和最近 8 条会话消息放入上下文，以 SSE 返回 `tool_start`、`tool_end`、`evidence`、`delta`、`done`/`error` 事件。会话消息保存在 `conversation_messages` 表；未配置模型时返回 503，不伪造回答。
+`POST /api/v1/chat/stream` 已接入 OpenAI 兼容的流式模型（与招生抓取共用 `MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME`）。它优先检索已发布、已审核的 `admission_units`；没有命中时回退到已发布的全国院校名录，只提供学校名称、所在地和办学层次，并明确说明名录不含专业、投档分和招生计划。用户最新画像和最近 8 条会话消息放入上下文，以 SSE 返回 `tool_start`、`tool_end`、`evidence`、`delta`、`done`/`error` 事件。会话消息保存在 `conversation_messages` 表；未配置模型时返回 503，不伪造回答。
 
 聊天回答不是正式推荐，不计算录取概率；个性化冲稳保仍需使用画像和推荐任务。当前没有向量检索、网页工具或跨用户记忆。提示词明确要求不编造院校代码、专业代码、分数、位次、学费和选科要求，并要求在检索数据与用户分数差距明显时说明该批次不适合。
 
