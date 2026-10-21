@@ -29,7 +29,8 @@ def legacy_save(
     db.commit()
     # Preserve the frontend's original Profile shape; version API is separate.
     return result(
-        request, {k: v for k, v in record.data.items() if k not in {"rank_cohort", "batch"}}
+        request,
+        {k: v for k, v in record.data.items() if k not in {"rank_cohort", "batch", "schools"}},
     )
 
 

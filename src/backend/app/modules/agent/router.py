@@ -36,7 +36,7 @@ logger = logging.getLogger("agent.chat")
 
 
 class ChatInput(StrictModel):
-    message: str = Field(min_length=1, max_length=3000)
+    message: str = Field(min_length=1, max_length=4000)
     conversationId: UUID | None = None
 
 
@@ -79,6 +79,7 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
         terms,
         target_score=target_score,
         target_rank=target_rank,
+        profile=profile,
     )
     context, source_ids = build_context(rows)
     history = history_for(db, conversation.id)

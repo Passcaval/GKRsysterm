@@ -7,10 +7,11 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import Field
+from sqlalchemy import select
 
 from app.core.errors import DomainError, missing, result
 from app.core.security import current_user
-from app.db.models import ChatProfileSignal, now
+from app.db.models import ChatProfileSignal, User, now
 from app.db.session import get_db
 from app.modules.agent.profile_signals import signal_view
 from app.modules.community.schemas import StrictModel
@@ -33,7 +34,12 @@ def resolve_signal(
     user=Depends(current_user),
     db=Depends(get_db),
 ):
-    signal = db.get(ChatProfileSignal, signal_id)
+    db.scalar(select(User).where(User.id == user.id).with_for_update())
+    signal = db.scalar(
+        select(ChatProfileSignal)
+        .where(ChatProfileSignal.id == signal_id, ChatProfileSignal.owner_id == user.id)
+        .with_for_update()
+    )
     if not signal or signal.owner_id != user.id:
         missing()
     if signal.status != "proposed":
@@ -56,7 +62,7 @@ def resolve_signal(
             "画像已在其他页面更新，请刷新后再确认。",
         )
     values = dict(current.data)
-    allowed = {"province", "score", "rank", "subjects"}
+    allowed = {"province", "year", "score", "rank", "subjects", "cities", "interests", "schools"}
     for change in signal.changes or []:
         field = change.get("field")
         if field not in allowed:

@@ -310,8 +310,12 @@ def deploy() -> None:
     ensure_env()
     validate_env()
     docker_compose("config", "--quiet")
-    docker_compose("up", "--detach", "--build", "--wait")
-    docker_compose("exec", "-T", "api", "python", "-m", "alembic", "upgrade", "head")
+    docker_compose("build")
+    docker_compose("up", "--detach", "--wait", "postgres")
+    # A new database has no job/crawl tables yet. Migrate before workers get
+    # their single startup-crawl attempt, using the newly built API image.
+    docker_compose("run", "--rm", "--no-deps", "api", "python", "-m", "alembic", "upgrade", "head")
+    docker_compose("up", "--detach", "--wait")
     print("Deployment is ready.")
     print("Open http://localhost:" + read_env().get("HTTP_PORT", "8080"))
 

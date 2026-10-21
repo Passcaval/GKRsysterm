@@ -339,8 +339,11 @@ export function createWorkflowApi(ctx: Context) {
         cursor = found + 1;
         matched += 1;
       }
-      if (matched === text.length) return 500 - Math.min(400, lower.length - text.length);
-      const common = [...new Set(text)].filter((char) => lower.includes(char)).length;
+      if (matched === text.length)
+        return 500 - Math.min(400, lower.length - text.length);
+      const common = [...new Set(text)].filter((char) =>
+        lower.includes(char),
+      ).length;
       return common ? Math.round((600 * common) / new Set(text).size) : 0;
     };
     const top = (values: string[], limit = 8) =>
@@ -360,7 +363,9 @@ export function createWorkflowApi(ctx: Context) {
           id: school.id,
           name: school.name,
           city: school.city,
-          score: score(school.name + " " + school.city + " " + school.majors.join(" ")),
+          score: score(
+            school.name + " " + school.city + " " + school.majors.join(" "),
+          ),
         }))
         .filter((school) => school.score >= 150)
         .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
@@ -386,16 +391,60 @@ export function createWorkflowApi(ctx: Context) {
             s.tuition !== null &&
             p.budgetScope !== "total";
           const over = budgetKnown && s.tuition! > p!.budget!;
+          const unknown = [
+            ...(!known ? ["选科及招生口径待确认"] : []),
+            ...(!budgetKnown ? ["学费或年度学费预算待确认"] : []),
+          ];
           const hardRegion =
             p?.preferences?.some(
               (x) => x.field === "preferred_regions" && x.strength === "hard",
             ) &&
             p.cities.length &&
-            !p.cities.includes(s.city);
+            !p.cities.some(
+              (region) => region === s.city || region === s.province,
+            );
+          const matches = [
+            ...(p?.cities.length
+              ? [
+                  {
+                    label: "地域",
+                    score: p.cities.some(
+                      (region) => region === s.city || region === s.province,
+                    )
+                      ? 100
+                      : 0,
+                  },
+                ]
+              : []),
+            ...(p?.interests.length
+              ? [
+                  {
+                    label: "专业",
+                    score: p.interests.some((interest) =>
+                      major.includes(interest),
+                    )
+                      ? 100
+                      : 0,
+                  },
+                ]
+              : []),
+            ...(p?.preferredSchools?.length
+              ? [
+                  {
+                    label: "院校",
+                    score: p.preferredSchools.some(
+                      (school) => s.name.includes(school) || s.id === school,
+                    )
+                      ? 100
+                      : 0,
+                  },
+                ]
+              : []),
+          ];
           const status =
             hardRegion || (known && (!passed || over))
               ? "fail"
-              : known
+              : !unknown.length
                 ? "pass"
                 : "unknown";
           const riskKnown =
@@ -414,7 +463,7 @@ export function createWorkflowApi(ctx: Context) {
             campusId: null,
             eligibility: {
               status,
-              missingRequirements: known ? [] : ["选科及招生口径待确认"],
+              missingRequirements: unknown,
             },
             historicalRisk: {
               status: riskKnown
@@ -425,13 +474,14 @@ export function createWorkflowApi(ctx: Context) {
                 : "暂无已确认的同省、同年份及同口径历史数据",
             },
             preferenceMatch: {
-              score: p?.interests.length
-                ? p.interests.includes(major)
-                  ? 90
-                  : 55
+              score: matches.length
+                ? Math.round(
+                    matches.reduce((sum, m) => sum + m.score, 0) /
+                      matches.length,
+                  )
                 : null,
-              coverage: p?.interests.length ? 0.5 : 0,
-              breakdown: [],
+              coverage: matches.length / 3,
+              breakdown: matches,
             },
             reasons: ["本地合成数据，仅用于演示推荐任务与条件检查"],
             evidenceIds: s.sourceIds,
@@ -444,7 +494,11 @@ export function createWorkflowApi(ctx: Context) {
           };
         }),
       )
-      .filter((item) => item.eligibility.status !== "fail");
+      .filter((item) => item.eligibility.status !== "fail")
+      .sort(
+        (a, b) =>
+          (b.preferenceMatch.score || 0) - (a.preferenceMatch.score || 0),
+      );
   }
   function progress(run: MockRun) {
     if (terminalRuns.includes(run.status) || run.status === "waiting_input")
@@ -856,10 +910,11 @@ export function createWorkflowApi(ctx: Context) {
           ["examYear", "year"],
           ["preferredRegions", "cities"],
           ["preferredMajors", "interests"],
+          ["preferredSchools", "preferredSchools"],
         ]) {
           if (wire in proposed) {
             proposed[local] = proposed[wire];
-            delete proposed[wire];
+            if (wire !== local) delete proposed[wire];
           }
         }
         if (proposed.budget && typeof proposed.budget === "object") {
@@ -879,6 +934,16 @@ export function createWorkflowApi(ctx: Context) {
       if (rank) proposed.rank = Number(rank[1]);
       const score = text.match(/(\d{2,3})\s*分/);
       if (score) proposed.score = Number(score[1]);
+      const subjects = [
+        "物理",
+        "化学",
+        "生物",
+        "历史",
+        "地理",
+        "政治",
+        "技术",
+      ].filter((s) => text.includes(s));
+      if (subjects.length === 3) proposed.subjects = subjects;
       return {
         proposedChanges: proposed,
         missingFields: missingForIntent(
@@ -941,7 +1006,7 @@ export function createWorkflowApi(ctx: Context) {
                 province_code: "请填写生源省份",
                 exam_year: "请填写报考年份",
                 score: "请填写高考分数",
-                subjects: "请填写选科，用逗号分隔（可选）",
+                subjects: "请填写三门选科，用逗号分隔",
                 rank: "请填写省内位次",
                 rank_cohort: "请填写位次口径（可选）",
                 consent: "是否同意本次使用画像信息？",
@@ -1608,7 +1673,9 @@ export function createWorkflowApi(ctx: Context) {
         );
       return request("/admin/admission-sources");
     },
-    async crawlRuns(cursor: string | null = null): Promise<Page<CrawlRunSummary>> {
+    async crawlRuns(
+      cursor: string | null = null,
+    ): Promise<Page<CrawlRunSummary>> {
       if (isMock)
         throw new ApiError(
           503,
@@ -1631,11 +1698,7 @@ export function createWorkflowApi(ctx: Context) {
         );
       return request("/admin/admissions/crawl", "POST", {}, { key });
     },
-    async crawlRun(
-      id: string,
-      offset = 0,
-      limit = 200,
-    ): Promise<CrawlRun> {
+    async crawlRun(id: string, offset = 0, limit = 200): Promise<CrawlRun> {
       if (isMock)
         throw new ApiError(
           503,

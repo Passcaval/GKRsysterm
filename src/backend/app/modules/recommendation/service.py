@@ -5,10 +5,23 @@ from sqlalchemy import select
 
 from app.core.errors import DomainError, missing
 from app.core.security import fingerprint, idempotency
-from app.db.models import Idempotency, Job, ProfileVersion, RecommendationRun, RunEvent, User
+from app.db.models import (
+    Idempotency,
+    Job,
+    ProfileVersion,
+    RecommendationRun,
+    RunEvent,
+    School,
+    User,
+)
 from app.modules.admissions.service import active_units, unit_view
 from app.modules.community.schemas import StrictModel
-from app.modules.profiles.service import ProfileInput, current_profile, save_profile
+from app.modules.profiles.service import (
+    ProfileInput,
+    current_profile,
+    recommendation_missing,
+    save_profile,
+)
 from app.modules.validation.service import validate_result
 
 
@@ -38,6 +51,7 @@ def rules(profile, unit):
     subjects = profile.get("subjects") or []
     cities = profile.get("cities") or []
     interests = profile.get("interests") or []
+    schools = profile.get("schools") or []
     budget = profile.get("budget")
     preferences = profile.get("preferences") or []
     failures, unknown = [], []
@@ -100,12 +114,33 @@ def rules(profile, unit):
         }
     breakdown = []
     if cities:
-        breakdown.append({"dimension": "city", "value": int(data.get("city") in cities)})
+        breakdown.append(
+            {
+                "dimension": "region",
+                "value": int(
+                    any(
+                        value in {data.get("city"), data.get("school_province")} for value in cities
+                    )
+                ),
+            }
+        )
     if interests:
         breakdown.append(
             {
                 "dimension": "major",
                 "value": int(any(x in data.get("major", "") for x in interests)),
+            }
+        )
+    if schools:
+        breakdown.append(
+            {
+                "dimension": "school",
+                "value": int(
+                    any(
+                        value in (data.get("school_name") or "") or value == data.get("school_id")
+                        for value in schools
+                    )
+                ),
             }
         )
     match = sum(x["value"] for x in breakdown) / len(breakdown) if breakdown else None
@@ -117,6 +152,7 @@ def rules(profile, unit):
         "campus_id": None,
         "campus": data.get("campus"),
         "city": data.get("city"),
+        "school_province": data.get("school_province"),
         "tuition": data.get("tuition"),
         "plan_count": data.get("plan_count"),
         "major": data.get("major", ""),
@@ -128,7 +164,7 @@ def rules(profile, unit):
         "historical_risk": risk,
         "preference_match": {
             "score": match,
-            "coverage": len(breakdown) / 2,
+            "coverage": len(breakdown) / 3,
             "breakdown": breakdown,
         },
         "reasons": ["条件判断来自已发布的官方资料版本", *failures],
@@ -139,18 +175,20 @@ def rules(profile, unit):
 
 
 OPTIONAL_LABELS = {
-    "subjects": "选科",
+    "score": "分数",
     "cities": "城市偏好",
     "interests": "专业兴趣",
+    "schools": "意向院校",
     "budget": "学费预算",
     "rank_cohort": "位次口径",
     "batch": "报考批次",
 }
 
 OPTIONAL_TEXTS = {
-    "subjects": "补充三门选科后，可判断专业选科硬条件",
+    "score": "分数可稍后补充，不影响先按位次与选科推荐",
     "cities": "补充城市偏好后，可按地域比较院校",
     "interests": "补充专业兴趣后，可优先展示匹配方向",
+    "schools": "意向院校可稍后补充，先比较不同院校方向",
     "budget": "补充学费预算后，可排除超预算选项",
     "rank_cohort": "补充位次口径后，可使用同口径历史参考",
     "batch": "确认报考批次后，可校验招生单位批次",
@@ -159,12 +197,14 @@ OPTIONAL_TEXTS = {
 
 def missing_optional_fields(profile) -> list[str]:
     missing = []
-    if len(profile.get("subjects") or []) != 3:
-        missing.append("subjects")
+    if profile.get("score") is None:
+        missing.append("score")
     if not profile.get("cities"):
         missing.append("cities")
     if not profile.get("interests"):
         missing.append("interests")
+    if not profile.get("schools"):
+        missing.append("schools")
     if profile.get("budget") is None:
         missing.append("budget")
     if not profile.get("rank_cohort"):
@@ -222,7 +262,9 @@ def build_branches(profile, candidates) -> list[dict]:
     city_sorted = sorted(
         candidates,
         key=lambda item: (
-            0 if item.get("city") in cities else 1,
+            0
+            if any(value in {item.get("city"), item.get("school_province")} for value in cities)
+            else 1,
             0 if item.get("city") not in (None, "", "待核对") else 1,
             item.get("city") or "",
             item.get("major") or "",
@@ -278,14 +320,15 @@ def build_branches(profile, candidates) -> list[dict]:
 
 def evaluate_snapshot(snapshot):
     profile = snapshot.get("profile")
-    if not profile:
+    needed = recommendation_missing(profile)
+    if needed:
         return {
             "items": [],
             "pending_confirmation": [],
             "excluded": [],
             "branches": [],
             "missing_info": [],
-            "questions": ["请补充考生画像、省份、年份、分数和位次。"],
+            "questions": [text for _, text in needed],
         }
     if profile.get("province") != "浙江" or profile.get("year") != 2026:
         raise DomainError(
@@ -298,8 +341,9 @@ def evaluate_snapshot(snapshot):
 
     def rank_key(item):
         return (
-            len(item["eligibility"]["missing_requirements"]),
             -(item["preference_match"]["score"] or 0),
+            len(item["eligibility"]["missing_requirements"]),
+            abs(profile["rank"] - item["historical_risk"].get("max_rank", profile["rank"])),
             -(item.get("plan_count") or 0),
             item.get("major") or "",
         )
@@ -358,6 +402,19 @@ def create_run(db, settings, actor, data, key):
         )
         if not profile:
             missing()
+    school_data = {str(s.id): s.data for s in db.scalars(select(School))}
+    units = []
+    for unit in active_units(db):
+        school = school_data.get(str(unit.school_id), {})
+        units.append(
+            {
+                **unit_view(unit),
+                "school_province": school.get("province"),
+                "school_name": school.get("name") or unit.data.get("school_name"),
+                "city": school.get("city") or unit.data.get("city"),
+            }
+        )
+    needed = recommendation_missing(profile.data if profile else None)
     run = RecommendationRun(
         owner_id=actor.id,
         profile_version_id=profile.id if profile else None,
@@ -365,18 +422,18 @@ def create_run(db, settings, actor, data, key):
             "question": data.question,
             "profile": profile.data if profile else None,
             "profile_history": [],
-            "units": [unit_view(u) for u in active_units(db)],
+            "units": units,
         },
-        status="queued" if profile else "waiting_input",
+        status="waiting_input" if needed else "queued",
         event_seq=0,
     )
     db.add(run)
     db.flush()
     emit(db, run, "status", {"status": run.status})
-    if profile:
+    if not needed:
         db.add(Job(task_type="recommendation", object_id=run.id))
     else:
-        emit(db, run, "question", {"questions": ["请补充省份、年份、选科及位次等考生画像。"]})
+        emit(db, run, "question", {"questions": [text for _, text in needed]})
     db.add(
         Idempotency(
             key=scoped,
@@ -413,9 +470,15 @@ def answer_run(db, actor, run_id, answer):
         },
     ]
     snapshot["profile"] = profile.data
-    run.snapshot, run.profile_version_id, run.status = snapshot, profile.id, "queued"
-    emit(db, run, "status", {"status": "queued"})
-    db.add(Job(task_type="recommendation", object_id=run.id))
+    needed = recommendation_missing(profile.data)
+    run.snapshot, run.profile_version_id, run.status = (
+        snapshot,
+        profile.id,
+        "waiting_input" if needed else "queued",
+    )
+    emit(db, run, "status", {"status": run.status})
+    if not needed:
+        db.add(Job(task_type="recommendation", object_id=run.id))
     return run
 
 

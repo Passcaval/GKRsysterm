@@ -11,16 +11,16 @@ from app.modules.community.schemas import StrictModel
 class ProfileInput(StrictModel):
     province: str = Field(min_length=1, max_length=30)
     year: int = Field(ge=2024, le=2035)
-    score: int = Field(ge=0, le=900)
+    score: int | None = Field(default=None, ge=0, le=900)
     rank: int = Field(ge=1, le=5000000)
-    # Only province, year, score and rank are required for a recommendation.
-    # The remaining fields are optional and are surfaced as follow-up prompts
-    # when absent; recommendations still run in an explicitly "unknown" state.
+    # Drafts may omit subjects; personalised runs require three confirmed subjects.
+    # Score and preferences can be added after the initial rank-based recommendation.
     subjects: list[Literal["物理", "化学", "生物", "历史", "地理", "政治", "技术"]] = Field(
         default_factory=list, max_length=3
     )
     cities: list[str] = Field(default_factory=list, max_length=30)
     interests: list[str] = Field(default_factory=list, max_length=30)
+    schools: list[str] = Field(default_factory=list, max_length=30)
     budget: float | None = Field(default=None, ge=0, le=10000000, allow_inf_nan=False)
     acceptAdjustment: bool = False
     consent: Literal[True]
@@ -37,6 +37,22 @@ class ProfileInput(StrictModel):
 class ProfilePatch(StrictModel):
     expected_version: int = Field(ge=0)
     profile: ProfileInput
+
+
+def recommendation_missing(profile: dict | None) -> list[tuple[str, str]]:
+    p = profile or {}
+    missing = []
+    if not p.get("province"):
+        missing.append(("province_code", "请填写生源省份，例如浙江"))
+    if not p.get("year"):
+        missing.append(("exam_year", "请填写报考年份"))
+    if len(p.get("subjects") or []) != 3:
+        missing.append(("subjects", "请选择三门选考科目"))
+    if p.get("rank") is None:
+        missing.append(("rank", "请填写省内位次"))
+    if not p.get("consent"):
+        missing.append(("consent", "是否同意将画像用于本次推荐？填写 true"))
+    return missing
 
 
 def current_profile(db, owner_id):

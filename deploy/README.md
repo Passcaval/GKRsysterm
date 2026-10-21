@@ -66,4 +66,4 @@ python deploy/manage.py backup
 
 `down` removes containers and the Compose network but preserves named volumes. Never add `--volumes`/`-v` unless you intend to permanently erase the database and uploads. `backup` exports PostgreSQL and private uploads into the ignored `backups/` directory; copy those files to protected off-machine storage. A restore must restore both artifacts together and should first be rehearsed against a separate deployment. The project has not yet had a production restore drill.
 
-For a new application image, run `python deploy/manage.py up`; Compose rebuilds and restarts services, then applies pending migrations. Review application release notes and take a backup before upgrading a deployment with important data.
+For a new application image, run `python deploy/manage.py up`. It builds images, waits for PostgreSQL, applies migrations in a one-off API container, and then starts application services and workers. This order lets the first automatic crawl see the required tables. Review application release notes and take a backup before upgrading a deployment with important data.

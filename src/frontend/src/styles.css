@@ -2589,6 +2589,94 @@ kbd {
   flex: 1;
   overscroll-behavior: contain;
 }
+.navigator-profile,
+.navigator-results {
+  border-top: 1px solid var(--line);
+  padding: 22px 0;
+  margin-top: 20px;
+}
+.navigator-profile h3,
+.navigator-results h3 {
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+.navigator-profile > p,
+.navigator-results p {
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 8px 0;
+}
+.navigator-profile fieldset {
+  border: 0;
+  min-width: 0;
+  padding: 0;
+  margin: 14px 0;
+}
+.navigator-profile .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.navigator-profile label {
+  font-size: 12px;
+}
+.navigator-profile input,
+.navigator-profile select {
+  min-width: 0;
+  width: 100%;
+}
+.navigator-profile input[type="checkbox"] {
+  width: auto;
+}
+.navigator-profile .subject-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.navigator-profile .subject-grid label {
+  padding: 10px 5px;
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+.navigator-profile legend {
+  font-size: 12px;
+  padding: 0;
+}
+.navigator-preferences summary {
+  color: var(--gold);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 12px 0;
+}
+.navigator-profile .switch-label {
+  margin: 15px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.navigator-profile .button {
+  width: 100%;
+}
+.navigator-results h3 small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: normal;
+  display: block;
+  margin-top: 6px;
+}
+.navigator-result {
+  border-bottom: 1px solid var(--line);
+  padding: 15px 0;
+}
+.navigator-result h4 {
+  font-size: 14px;
+  line-height: 1.7;
+}
+.navigator-directions {
+  margin: 15px 0;
+}
+.navigator-directions strong {
+  color: var(--gold);
+}
 .chat-welcome h2 {
   font-size: 33px;
   color: #dcc99f;

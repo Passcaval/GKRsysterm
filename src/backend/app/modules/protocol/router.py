@@ -35,6 +35,7 @@ from app.db.models import (
 )
 from app.db.session import get_db
 from app.modules.admissions.service import active_units, school_views
+from app.modules.agent.profile_signals import extract_profile_values
 from app.modules.community import content, registration
 from app.modules.community import router as accounts
 from app.modules.community.schemas import Decision, Login, PostFeedbackInput
@@ -305,8 +306,31 @@ def versions(request: Request, user=Depends(current_user), db=Depends(get_db)):
 
 
 @router.post("/me/profile/parse")
-def parse(user=Depends(current_user)):
-    not_implemented()
+def parse(
+    request: Request,
+    data: dict = Body(),
+    user=Depends(current_user),
+    db=Depends(get_db),
+):
+    validate("ProfileParseInput", data)
+    proposed = extract_profile_values(data["text"])
+    current = current_profile(db, user.id)
+    snapshot = {"profile": {**(current.data if current else {}), **proposed}}
+    mapping = {
+        "province": "province_code",
+        "year": "exam_year",
+        "cities": "preferred_regions",
+        "interests": "preferred_majors",
+        "schools": "preferred_schools",
+    }
+    return result(
+        request,
+        {
+            "proposed_changes": {mapping.get(key, key): value for key, value in proposed.items()},
+            "missing_fields": [q["field"] for q in questions(snapshot)],
+            "questions": ["请确认识别结果；未提及字段保持原值，不会自动保存。"],
+        },
+    )
 
 
 @router.get("/schools")
@@ -474,12 +498,14 @@ def answer(
         for field, value in data["answers"].items():
             if field == "province_code":
                 values["province"] = value
-            elif field in {"rank", "exam_year"}:
+            elif field in {"rank", "exam_year", "score"}:
                 values["year" if field == "exam_year" else field] = int(value)
             elif field == "budget":
                 values["budget"] = float(value)
             elif field == "subjects":
                 values[field] = [x for x in re.split(r"[,，、\s]+", value.strip()) if x]
+            elif field in {"cities", "interests", "schools"}:
+                values[field] = [x for x in re.split(r"[,，、]+", value.strip()) if x]
             elif field == "consent":
                 values[field] = value.lower() in {"true", "是", "同意"}
             else:

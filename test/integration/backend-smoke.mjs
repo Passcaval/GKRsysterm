@@ -158,6 +158,62 @@ try {
     ],
   });
   assert.equal((await api.simulate(plan)).probabilities, null);
+  // The navigator uses this same adapter: minimum inputs first, preferences later.
+  const latestProfile = (await api.bootstrap()).profile;
+  const minimal = await api.profile({
+    ...latestProfile,
+    score: null,
+    cities: [],
+    interests: [],
+    preferredSchools: [],
+    budget: null,
+    rankCohort: null,
+  });
+  let initial = await api.createRun(
+    {
+      question: "先推荐几个方向",
+      intent: "admission",
+      profileVersionId: minimal.profileVersionId,
+      riskPreference: 50,
+    },
+    "navigator-minimum",
+  );
+  assert.notEqual(initial.status, "waiting_input");
+  for (
+    let i = 0;
+    i < 100 && !["succeeded", "failed"].includes(initial.status);
+    i++
+  ) {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    initial = await api.getRun(initial.runId);
+  }
+  assert.equal(initial.validation.status, "passed");
+  assert.equal(initial.branches.length, 3);
+  assert.ok(
+    initial.missingInfo.some((q) => q.field === "score" && !q.required),
+  );
+  const parsed = await api.parseProfile(
+    "我想去江苏。意向院校：合成测试大学。想学计算机专业",
+  );
+  assert.equal(parsed.proposedChanges.province, undefined);
+  assert.deepEqual(parsed.proposedChanges.cities, ["江苏"]);
+  assert.deepEqual(parsed.proposedChanges.preferredSchools, ["合成测试大学"]);
+  assert.equal((await api.bootstrap()).profile.version, minimal.version);
+  const refined = await api.profile({ ...minimal, ...parsed.proposedChanges });
+  assert.equal(refined.province, "浙江");
+  assert.equal(refined.version, minimal.version + 1);
+  assert.deepEqual(refined.preferredSchools, ["合成测试大学"]);
+  const refreshed = await api.createRun(
+    {
+      question: "根据补充的偏好更新",
+      intent: "admission",
+      profileVersionId: refined.profileVersionId,
+      riskPreference: 50,
+    },
+    "navigator-refined",
+  );
+  assert.equal(refreshed.profileVersionId, refined.profileVersionId);
+  assert.deepEqual(await api.getRun(initial.runId), initial);
   await api.logout();
   assert.equal((await api.bootstrap()).user, null);
   assert.equal(

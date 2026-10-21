@@ -19,6 +19,7 @@ export interface Profile {
   subjects: string[];
   cities: string[];
   interests: string[];
+  preferredSchools?: string[];
   budget: number | null;
   acceptAdjustment: boolean;
   consent: boolean;

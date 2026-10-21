@@ -10,11 +10,36 @@ import {
 } from "lucide-react";
 import { api, isMock } from "../api";
 import { Evidence, Modal } from "../components";
-import type { ChatMessage, ProfileUpdateChange } from "../types";
+import type {
+  ChatMessage,
+  Profile,
+  ProfileUpdateChange,
+  RecommendationRun,
+} from "../types";
 import { useApp } from "../store";
-import { errorText } from "../transport";
+import { errorText, profileToWire } from "../transport";
+import NavigatorProfile from "../NavigatorProfile";
+import {
+  missingForIntent,
+  runLabels,
+  terminalRuns,
+  visibleRunItems,
+} from "../workflow-domain";
 export default function Chat({ onClose }: { onClose: () => void }) {
-  const { update, notify, navigate } = useApp();
+  const { data, update, notify, navigate } = useApp();
+  const owner = data.user?.id;
+  const [draftProposal, setDraftProposal] = useState<Partial<Profile> | null>(
+    null,
+  );
+  const [runId, setRunId] = useState(() =>
+    owner ? sessionStorage.getItem("nv-last-run:" + owner) || "" : "",
+  );
+  const [run, setRun] = useState<RecommendationRun | null>(null);
+  const [runBusy, setRunBusy] = useState(false);
+  const [runError, setRunError] = useState("");
+  const [wake, setWake] = useState(0);
+  const generation = useRef(0);
+  const createKey = useRef({ body: "", key: "" });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,6 +59,89 @@ export default function Chat({ onClose }: { onClose: () => void }) {
   const controller = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
+  useEffect(
+    () => () => {
+      generation.current++;
+    },
+    [owner],
+  );
+  useEffect(() => {
+    if (!runId || !owner) return;
+    let active = true;
+    const c = new AbortController();
+    async function listen() {
+      try {
+        let snapshot = await api.getRun(runId);
+        if (!active) return;
+        setRun(snapshot);
+        if (
+          terminalRuns.includes(snapshot.status) ||
+          snapshot.status === "waiting_input"
+        )
+          return;
+        for await (const event of api.runEvents(
+          runId,
+          snapshot.lastEventId,
+          c.signal,
+        )) {
+          if (!active) return;
+          snapshot = await api.getRun(runId);
+          if (!active) return;
+          setRun(snapshot);
+          if (terminalRuns.includes(snapshot.status)) break;
+        }
+      } catch (e) {
+        if (active && !c.signal.aborted) setRunError(errorText(e));
+      }
+    }
+    void listen();
+    return () => {
+      active = false;
+      c.abort();
+    };
+  }, [runId, owner, wake]);
+  async function recommend(profile: Profile, save = true) {
+    if (!owner || runBusy) return;
+    const current = ++generation.current;
+    setRunBusy(true);
+    setRunError("");
+    try {
+      let saved = profile;
+      if (
+        save &&
+        JSON.stringify(profileToWire(profile)) !==
+          JSON.stringify(data.profile ? profileToWire(data.profile) : null)
+      ) {
+        saved = await api.profile(profile);
+        if (generation.current !== current) return;
+        update({ profile: saved });
+      }
+      if (missingForIntent(saved, "admission").length)
+        throw new Error("请先确认省份、位次、三门选科及使用授权。");
+      const input = {
+        question:
+          "根据已确认的位次、选科和现有偏好，推荐可比较的院校专业方向，并说明理由及待核对信息。",
+        intent: "admission" as const,
+        riskPreference: 50,
+        profileVersionId: saved.profileVersionId || null,
+      };
+      const body = JSON.stringify(input);
+      if (createKey.current.body !== body)
+        createKey.current = { body, key: crypto.randomUUID() };
+      const next = await api.createRun(input, createKey.current.key);
+      if (generation.current !== current) return;
+      sessionStorage.setItem("nv-last-run:" + owner, next.runId);
+      setRun(next);
+      setRunId(next.runId);
+      setWake((v) => v + 1);
+      createKey.current = { body: "", key: "" };
+      setDraftProposal(null);
+    } catch (e) {
+      if (generation.current === current) setRunError(errorText(e));
+    } finally {
+      if (generation.current === current) setRunBusy(false);
+    }
+  }
   useEffect(() => {
     field.current?.focus();
     const q = sessionStorage.getItem("nv-question");
@@ -66,6 +174,8 @@ export default function Chat({ onClose }: { onClose: () => void }) {
       if (result.profile) update({ profile: result.profile });
       notify(decision === "confirm" ? "考生画像已更新" : "已保留原画像");
       setProfileProposal(null);
+      if (decision === "confirm" && result.profile)
+        await recommend(result.profile, false);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -88,6 +198,15 @@ export default function Chat({ onClose }: { onClose: () => void }) {
     const c = new AbortController();
     controller.current = c;
     try {
+      if (!data.profile) {
+        try {
+          const parsed = await api.parseProfile(text);
+          if (Object.keys(parsed.proposedChanges).length)
+            setDraftProposal(parsed.proposedChanges);
+        } catch {
+          /* The structured form remains usable if parsing is unavailable. */
+        }
+      }
       for await (const e of api.chat(text, conversation, c.signal)) {
         if (e.type === "tool_start")
           setTrace((t) => [
@@ -145,7 +264,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
         onKeyDown={(e) => {
           if (e.key === "Tab") {
             const focusables = e.currentTarget.querySelectorAll<HTMLElement>(
-              "button:not(:disabled),input,a[href],textarea",
+              "button:not(:disabled),input:not(:disabled),select:not(:disabled),summary,a[href],textarea:not(:disabled)",
             );
             const first = focusables[0],
               last = focusables[focusables.length - 1];
@@ -183,10 +302,10 @@ export default function Chat({ onClose }: { onClose: () => void }) {
               <br />
               我们一起看看。
             </h2>
-            <p>告诉我你的分数、喜欢的专业，或一所让你心动的学校。</p>
+            <p>先按省份、位次和选科看看方向，再一起找到适合你的院校和专业。</p>
             <div className="chips">
               {[
-                "适合我的计算机院校有哪些？",
+                "我还没有院校和专业偏好，可以先推荐几个方向吗？",
                 "如何判断一篇校园体验是否可信？",
               ].map((q) => (
                 <button key={q} onClick={() => setInput(q)}>
@@ -196,6 +315,148 @@ export default function Chat({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </div>
+          {data.user ? (
+            <NavigatorProfile
+              profile={data.profile}
+              proposal={draftProposal}
+              busy={runBusy || resolvingProfile}
+              onRecommend={recommend}
+            />
+          ) : (
+            <p className="notice amber">
+              登录后，填写省份、位次与选科即可在这里获得推荐。
+              <button
+                className="text-button"
+                onClick={() => {
+                  onClose();
+                  navigate("/login");
+                }}
+              >
+                前往登录
+              </button>
+            </p>
+          )}
+          {runError && (
+            <div role="alert" className="notice amber">
+              <p>{runError}</p>
+              {runId && (
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setRunError("");
+                    setWake((v) => v + 1);
+                  }}
+                >
+                  重新连接推荐任务
+                </button>
+              )}
+            </div>
+          )}
+          {run && (
+            <section className="navigator-results" aria-live="polite">
+              <h3>
+                领航员为你找到的方向 <small>{runLabels[run.status]}</small>
+              </h3>
+              {run.profileVersionId !== data.profile?.profileVersionId ? (
+                <p>画像已更新，请按上面的新信息更新推荐。</p>
+              ) : (
+                <>
+                  {!terminalRuns.includes(run.status) && (
+                    <p>
+                      {run.status === "waiting_input"
+                        ? run.questions.map((q) => q.text).join("；")
+                        : "正在对照已发布招生资料检查条件，结果会直接显示在这里。"}
+                    </p>
+                  )}
+                  {run.validation.status === "passed" && (
+                    <>
+                      <p className="muted">
+                        依据画像 v{data.profile?.version}。
+                        {isMock
+                          ? "当前为合成演示数据。"
+                          : "来源为已发布招生资料。"}
+                        缺少偏好时先比较方向，待确认条件会保留提示。
+                      </p>
+                      {visibleRunItems(run)
+                        .slice(0, 6)
+                        .map((item) => (
+                          <article
+                            className="navigator-result"
+                            key={item.recommendationItemId}
+                          >
+                            <h4>
+                              {item.schoolName ||
+                                data.schools.find((s) => s.id === item.schoolId)
+                                  ?.name ||
+                                "院校待核对"}{" "}
+                              · {item.major}
+                            </h4>
+                            <p>{item.reasons.join("；")}</p>
+                            <p className="muted">
+                              {item.preferenceMatch.score === null
+                                ? "尚未设置偏好，先作为探索方向"
+                                : `偏好匹配 ${item.preferenceMatch.score}/100`}{" "}
+                              ·{" "}
+                              {item.eligibility.status === "unknown"
+                                ? "条件待确认"
+                                : "满足已知条件"}
+                            </p>
+                            <p className="warning-text">
+                              {item.eligibility.missingRequirements.join("；")}
+                            </p>
+                            <p className="muted">
+                              {item.historicalRisk.reason}
+                            </p>
+                            <button
+                              type="button"
+                              className="text-button"
+                              onClick={() => setEvidence(item.evidenceIds)}
+                            >
+                              查看来源依据 <ArrowUpRight size={13} />
+                            </button>
+                          </article>
+                        ))}
+                      {!visibleRunItems(run).length && (
+                        <p>
+                          {run.summary ||
+                            "暂时没有可展示的招生单位，请确认官方数据已审核发布。"}
+                        </p>
+                      )}
+                      {!!run.branches?.length && (
+                        <div className="navigator-directions">
+                          {run.branches.map((branch) => (
+                            <p key={branch.branchId}>
+                              <strong>{branch.title}</strong>
+                              <br />
+                              {branch.pros[0]}；{branch.cons[0]}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      <p className="muted">
+                        接下来可以补充想去的省份、院校或专业，也可以先告诉我你更在意什么。
+                      </p>
+                    </>
+                  )}
+                  {run.status === "failed" && (
+                    <p className="warning-text">
+                      {run.error ||
+                        "任务未完成，请核对当前支持范围和服务状态。"}
+                    </p>
+                  )}
+                </>
+              )}
+              <button
+                className="text-button"
+                onClick={() => {
+                  onClose();
+                  navigate("/routes");
+                }}
+              >
+                查看完整推荐与任务记录 <ArrowUpRight size={13} />
+              </button>
+            </section>
+          )}
           {messages.map((m, i) => (
             <article key={i} className={`chat-message ${m.role}`}>
               <span className="message-role">
@@ -261,7 +522,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
                 ))}
               </ul>
               <p className="muted">
-                确认后会生成新的考生画像版本，原版本仍保留在历史中。
+                确认后会生成新的画像版本并更新推荐，原版本和推荐记录保留。
               </p>
               <div className="form-actions">
                 <button
@@ -270,7 +531,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
                   disabled={resolvingProfile}
                   onClick={() => void resolveProfile("confirm")}
                 >
-                  {resolvingProfile ? "处理中…" : "更新画像"}
+                  {resolvingProfile ? "处理中…" : "确认并更新推荐"}
                 </button>
                 <button
                   type="button"

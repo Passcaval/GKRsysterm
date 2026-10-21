@@ -83,14 +83,15 @@ def test_chat_proposes_and_confirms_profile_calibration(app, modern_chat, publis
     assert changes["province"]["new"] == "浙江"
     assert changes["score"]["new"] == 628
     assert changes["rank"]["new"] == 20000
-    assert proposal["source_ids"]
+    # Zhejiang rows cannot be cited as matching the still-confirmed Henan profile.
+    assert proposal["source_ids"] == []
     assert "更新考生画像" in proposal["question"]
 
     with app.state.sessions() as db:
         signal = db.get(ChatProfileSignal, proposal["signal_id"])
         assert signal.status == "proposed"
         assert signal.query_text.startswith("我现在在浙江")
-        assert signal.source_ids
+        assert signal.source_ids == []
 
     resolved = modern_chat.post(
         f"/api/v1/chat/profile-signals/{proposal['signal_id']}/resolve",
@@ -118,7 +119,7 @@ def test_chat_profile_proposal_can_be_rejected(app, modern_chat, published):
     assert saved.status_code == 200
     response = modern_chat.post(
         "/api/v1/chat/stream",
-        json={"message": "江苏的计算机专业怎么样？"},
+        json={"message": "我的生源省份是江苏，计算机专业怎么样？"},
     )
     proposal = next(item for item in events(response) if item["type"] == "profile_update")
     resolved = modern_chat.post(

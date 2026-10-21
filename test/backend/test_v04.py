@@ -263,7 +263,7 @@ def test_v04_unsupported_features_are_explicit_and_no_sharing(modern):
     )
     sign_in(modern)
     assert "verification:review" not in modern.get("/api/v1/auth/me").json()["data"]["permissions"]
-    for path in ("/api/v1/me/profile/parse", "/api/v1/me/case-sharing-consent"):
+    for path in ("/api/v1/me/case-sharing-consent",):
         r = modern.post(path, json={"consent": True})
         assert r.status_code == 503
         validate("Error", r.json())

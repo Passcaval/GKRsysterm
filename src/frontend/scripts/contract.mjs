@@ -45,6 +45,7 @@ const profileFields = {
   }),
   preferred_regions: strings,
   preferred_majors: strings,
+  preferred_schools: { ...strings, maxItems: 30 },
   accept_adjustment: bool,
   consent: bool,
   preferences: arr(
@@ -80,11 +81,20 @@ const schemas = {
     student_verified: bool,
     permissions: strings,
   }),
-  Profile: obj({
-    ...profileFields,
-    version: int({ minimum: 1 }),
-    profile_version_id: id,
-  }),
+  Profile: obj(
+    {
+      ...profileFields,
+      version: int({ minimum: 1 }),
+      profile_version_id: id,
+    },
+    [
+      ...Object.keys(profileFields).filter(
+        (key) => key !== "preferred_schools",
+      ),
+      "version",
+      "profile_version_id",
+    ],
+  ),
   ProfilePatch: input(
     { ...profileFields, expected_version: int({ minimum: 0 }) },
     ["expected_version"],
