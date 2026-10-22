@@ -114,6 +114,67 @@
         }
       }
     },
+    "/api/v1/atlas/search": {
+      "post": {
+        "tags": [
+          "public atlas exploration"
+        ],
+        "summary": "Search",
+        "operationId": "search_api_v1_atlas_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtlasQuery"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "request_id"
+                  ],
+                  "properties": {
+                    "data": {},
+                    "request_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -11695,6 +11756,77 @@
         },
         "type": "object",
         "title": "Analysis"
+      },
+      "AtlasQuery": {
+        "properties": {
+          "province": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Province",
+            "default": "浙江"
+          },
+          "year": {
+            "type": "integer",
+            "maximum": 2100.0,
+            "minimum": 2020.0,
+            "title": "Year",
+            "default": 2026
+          },
+          "rank": {
+            "type": "integer",
+            "maximum": 5000000.0,
+            "minimum": 1.0,
+            "title": "Rank",
+            "default": 8000
+          },
+          "subjects": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "物理",
+                "化学",
+                "生物",
+                "政治",
+                "历史",
+                "地理",
+                "技术"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Subjects"
+          },
+          "cities": {
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Cities"
+          },
+          "majors": {
+            "items": {
+              "type": "string",
+              "maxLength": 80,
+              "minLength": 1
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Majors"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Query",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AtlasQuery"
       },
       "Batch": {
         "properties": {

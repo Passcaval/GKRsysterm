@@ -5,12 +5,22 @@ import {
   useEffect,
   useCallback,
   useRef,
+  useMemo,
   type ReactNode,
 } from "react";
 import type { Bootstrap } from "./types";
+import {
+  loadNavigator,
+  saveNavigator,
+  type NavigatorState,
+} from "./navigator-state";
 import { api } from "./api";
 import { onSessionReset, sessionEpoch, errorText } from "./transport";
 interface State {
+  navigator: NavigatorState;
+  setNavigator: (
+    next: NavigatorState | ((value: NavigatorState) => NavigatorState),
+  ) => void;
   data: Bootstrap;
   refresh: () => Promise<void>;
   update: (value: Partial<Bootstrap>) => void;
@@ -28,6 +38,26 @@ export function Provider({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const generation = useRef(0);
+  const owner = data?.user?.id || "anonymous";
+  const [navCache, setNavCache] = useState<{
+    owner: string;
+    value: NavigatorState;
+  } | null>(null);
+  const navigator = useMemo(
+    () => (navCache?.owner === owner ? navCache.value : loadNavigator(owner)),
+    [owner, navCache],
+  );
+  const setNavigator = (
+    next: NavigatorState | ((value: NavigatorState) => NavigatorState),
+  ) => {
+    setNavCache((previous) => {
+      const current =
+        previous?.owner === owner ? previous.value : loadNavigator(owner);
+      const value = typeof next === "function" ? next(current) : next;
+      saveNavigator(owner, value);
+      return { owner, value };
+    });
+  };
   const refresh = useCallback(async () => {
     const current = ++generation.current,
       epoch = sessionEpoch();
@@ -96,6 +126,8 @@ export function Provider({ children }: { children: ReactNode }) {
     <Context.Provider
       value={{
         data,
+        navigator,
+        setNavigator,
         refresh,
         update: (v) => setData((d) => (d ? { ...d, ...v } : d)),
         notify: setToast,

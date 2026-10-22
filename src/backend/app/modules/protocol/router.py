@@ -870,13 +870,14 @@ def chat(request: Request, data: dict = Body(), user=Depends(optional_user), db=
     from app.modules.agent.router import ChatInput
     from app.modules.agent.router import chat as old_chat
 
-    if set(data) - {"message", "conversation_id", "history"}:
+    if set(data) - {"message", "conversation_id", "history", "profile_context"}:
         raise DomainError(422, "INVALID_INPUT", "对话字段不正确。")
     try:
         parsed = ChatInput(
             message=data.get("message", ""),
             conversationId=data.get("conversation_id"),
             history=data.get("history", []),
+            profile_context=data.get("profile_context"),
         )
     except ValidationError:
         raise DomainError(422, "INVALID_INPUT", "对话内容或会话编号不正确。") from None

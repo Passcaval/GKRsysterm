@@ -12,6 +12,7 @@ from app.core.config import Settings
 from app.core.contract import install_contract
 from app.core.errors import error_response, install_handlers, result
 from app.db.session import configure_db
+from app.modules.admissions.atlas import router as atlas
 from app.modules.admissions.config import load_admission_config
 from app.modules.admissions.crawl_router import router as admissions_crawl
 from app.modules.admissions.knowledge_router import router as admission_knowledge
@@ -82,6 +83,7 @@ def create_app(settings: Settings | None = None, *, contract_version="0.4"):
 
     app = FastAPI(title="Night Voyage M0–M1", version="0.1.0", lifespan=lifespan)
     app.include_router(admission_knowledge)
+    app.include_router(atlas)
     app.state.settings = settings
     app.state.contract_version = contract_version
     app.state.admission_config, app.state.admission_config_error = load_admission_config(settings)

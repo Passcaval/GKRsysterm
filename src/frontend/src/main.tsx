@@ -334,11 +334,9 @@ function App() {
           <span>问问领航员</span>
           <kbd>/</kbd>
         </button>
-        {chat && (
-          <Suspense fallback={null}>
-            <Chat onClose={() => setChat(false)} />
-          </Suspense>
-        )}
+        <Suspense fallback={null}>
+          <Chat open={chat} onClose={() => setChat(false)} />
+        </Suspense>
       </div>
     </div>
   );

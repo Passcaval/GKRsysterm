@@ -12,11 +12,14 @@ import { useApp } from "../store";
 import { StarMap } from "./Explore";
 import { SchoolCard, Empty } from "../components";
 import type { School } from "../types";
-import { api, isMock } from "../api";
-import { errorText } from "../transport";
+import { isMock } from "../api";
+import { atlasContext } from "../navigator-state";
+import { useAtlasResults } from "../atlas-results";
 
 export function Explore() {
-  const { data, navigate } = useApp();
+  const { data, navigator, navigate } = useApp();
+  const profile = navigator.profile || data.profile;
+  const preferenceKey = JSON.stringify(profile);
   const [dockedSchoolId, setDockedSchoolId] = useState<string | null>(() =>
     sessionStorage.getItem("nv-atlas-dock"),
   );
@@ -25,8 +28,28 @@ export function Explore() {
   const [filters, setFilters] = useState(false),
     [view, setView] = useState<"map" | "list">("map");
   const [query, setQuery] = useState(""),
-    [city, setCity] = useState("全部城市"),
-    [major, setMajor] = useState("全部专业");
+    [city, setCity] = useState(profile?.cities.join("、") || ""),
+    [major, setMajor] = useState(profile?.interests.join("、") || "");
+  const [applied, setApplied] = useState({ query: "", city, major });
+  useEffect(() => {
+    const city = profile?.cities.join("、") || "",
+      major = profile?.interests.join("、") || "";
+    setCity(city);
+    setMajor(major);
+    setQuery("");
+    setApplied({ query: "", city, major });
+  }, [preferenceKey]);
+  const context = atlasContext(
+    profile,
+    applied.city,
+    applied.major,
+    applied.query,
+  );
+  const contextKey = JSON.stringify(context);
+  const result = useAtlasResults(context);
+  const schools = result.value?.items || [];
+  const loading = result.loading,
+    error = result.error;
   const [selected, setSelected] = useState<School | null>(null);
   function arrive() {
     if (!sailingTo || journeyDone.current) return;
@@ -42,60 +65,16 @@ export function Explore() {
     setFilters(false);
     setSailingTo(school);
   }
-  const [remoteSchools, setRemoteSchools] = useState<School[]>([]),
-    [cursor, setCursor] = useState<string | null>(null),
-    [loading, setLoading] = useState(false),
-    [error, setError] = useState("");
-  useEffect(() => {
-    if (isMock) return;
-    let active = true;
-    setRemoteSchools([]);
-    setCursor(null);
-    setLoading(true);
-    setError("");
-    const timer = setTimeout(
-      () =>
-        api
-          .schools(
-            query,
-            null,
-            city === "全部城市" ? "" : city,
-            major === "全部专业" ? "" : major,
-          )
-          .then((page) => {
-            if (active) {
-              setRemoteSchools(page.items);
-              setCursor(page.nextCursor);
-            }
-          })
-          .catch((e) => {
-            if (active) setError(errorText(e));
-          })
-          .finally(() => {
-            if (active) setLoading(false);
-          }),
-      200,
-    );
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [query, city, major]);
-  const schools = isMock
-    ? data.schools.filter(
-        (s) =>
-          (s.name + s.city + s.majors.join("")).includes(query) &&
-          (city === "全部城市" || s.city === city) &&
-          (major === "全部专业" || s.majors.includes(major)),
-      )
-    : remoteSchools;
   useEffect(() => {
     setSelected(null);
-  }, [query, city, major, view]);
+  }, [contextKey, view]);
   function reset() {
+    const city = profile?.cities.join("、") || "",
+      major = profile?.interests.join("、") || "";
     setQuery("");
-    setCity("全部城市");
-    setMajor("全部专业");
+    setCity(city);
+    setMajor(major);
+    setApplied({ query: "", city, major });
   }
   return (
     <section
@@ -146,30 +125,41 @@ export function Explore() {
             />
           </label>
           <div className="atlas-filter-row">
-            <select
-              aria-label="按城市筛选"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-            >
-              {["全部城市", ...new Set(data.schools.map((s) => s.city))].map(
-                (c) => (
-                  <option key={c}>{c}</option>
-                ),
-              )}
-            </select>
-            <select
-              aria-label="按专业筛选"
-              value={major}
-              onChange={(e) => setMajor(e.target.value)}
-            >
-              {[
-                "全部专业",
-                ...new Set(data.schools.flatMap((s) => s.majors)),
-              ].map((m) => (
-                <option key={m}>{m}</option>
-              ))}
-            </select>
+            <label>
+              城市或省份
+              <input
+                aria-label="按城市筛选"
+                placeholder="如 杭州、南京"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+              />
+            </label>
+            <label>
+              专业方向
+              <input
+                aria-label="按专业筛选"
+                placeholder="如 计算机、临床医学"
+                value={major}
+                onChange={(e) => setMajor(e.target.value)}
+              />
+            </label>
           </div>
+          <p>
+            当前依据：{context.province} · {context.rank.toLocaleString()} 名
+            {!profile?.rank
+              ? "（默认参考位次，可在领航员中补充）"
+              : "（来自领航员）"}
+          </p>
+          <button
+            className="button gold-button"
+            disabled={loading}
+            onClick={() => {
+              setApplied({ query, city, major });
+              setSelected(null);
+            }}
+          >
+            {loading ? "正在查找院校…" : "应用筛选"}
+          </button>
           <div className="atlas-filter-row">
             <div className="segmented">
               <button
@@ -194,10 +184,13 @@ export function Explore() {
               </button>
             </div>
             <button className="text-button" onClick={reset}>
-              重置筛选
+              恢复对话条件
             </button>
           </div>
-          <p>示例数据，仅供探索；最终请核对官方招生信息。</p>
+          <p>
+            {result.value?.note ||
+              "按历史位次距离排序；未知数据会明确标注，录取条件以官方发布为准。"}
+          </p>
         </section>
       )}
       {view === "map" ? (
@@ -222,47 +215,26 @@ export function Explore() {
       {!schools.length && !loading && !error && (
         <div className="atlas-empty">
           <Empty
-            text="没有符合条件的院校，试着放宽筛选。"
+            text={
+              result.value?.note ||
+              "没有取得符合条件的可引用资料，试着放宽城市或专业。"
+            }
             action="重置筛选"
             onAction={reset}
           />
         </div>
       )}
-      {(loading || error || cursor) && (
+      {(loading || error) && (
         <div className="atlas-load-more" role="status">
           {loading ? (
-            <span>正在读取院校…</span>
-          ) : error ? (
-            <span>{error}</span>
+            <span>正在查找位次附近的院校与官方资料…</span>
           ) : (
-            <button
-              className="button"
-              disabled={!!sailingTo}
-              onClick={async () => {
-                setLoading(true);
-                try {
-                  const page = await api.schools(
-                    query,
-                    cursor,
-                    city === "全部城市" ? "" : city,
-                    major === "全部专业" ? "" : major,
-                  );
-                  setRemoteSchools((rows) => [
-                    ...rows,
-                    ...page.items.filter(
-                      (s) => !rows.some((r) => r.id === s.id),
-                    ),
-                  ]);
-                  setCursor(page.nextCursor);
-                } catch (e) {
-                  setError(errorText(e));
-                } finally {
-                  setLoading(false);
-                }
-              }}
-            >
-              加载更多院校（当前{schools.length}所）
-            </button>
+            <>
+              <span>{error}</span>
+              <button className="button" onClick={result.retry}>
+                重试
+              </button>
+            </>
           )}
         </div>
       )}
@@ -311,8 +283,8 @@ export function Explore() {
         </div>
       )}
       <span className="atlas-disclaimer">
-        {isMock ? "示例位次与布局" : "当前仅显示已加载院校；布局不代表录取风险"}{" "}
-        · 以当年官方发布为准
+        {context.province} · 参考位次 {context.rank.toLocaleString()} ·{" "}
+        {isMock ? "示例" : "历史参考，非录取概率"} · 以当年官方发布为准
       </span>
     </section>
   );

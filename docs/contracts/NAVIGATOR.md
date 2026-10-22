@@ -12,7 +12,7 @@
 
 ## 前后端流程
 
-1. `/api/v1/chat/stream` 在回答前从用户消息中确定性识别省份、年份、分数、位次、完整三门选科、意向地域、专业和院校。识别结果自动合并进新的 `ProfileVersion`，同时写入 `chat_profile_signals` 作为检索反馈和版本审计；SSE `profile_update` 携带 `applied: true`、全局画像和本会话画像，前端立即更新星图与推荐状态。每个会话只使用本会话信号构建对话画像，新会话不会继承其他会话或全局画像中的旧信息；全局画像仍供星图使用。未登录请求不写 `ProfileVersion` 或 `chat_profile_signals`，只从请求携带的 `history` 推导临时会话画像。
+1. `/api/v1/chat/stream` 在回答前从用户消息中确定性识别省份、年份、分数、位次、完整三门选科、意向地域、专业和院校。识别结果自动合并进新的 `ProfileVersion`，同时写入 `chat_profile_signals` 作为检索反馈和版本审计；SSE `profile_update` 携带 `applied: true`、全局画像和本会话画像，前端立即更新星图与推荐状态。每个会话只使用本会话信号构建对话画像，新会话不会继承其他会话或全局画像中的旧信息；全局画像仍供星图使用。未登录请求不写 `ProfileVersion` 或 `chat_profile_signals`，从 profile_context 和新消息整理临时会话信息；旧客户端仍可仅发送 history。
 2. 如果信息还不完整，保存的是草稿：缺失的省份、位次、选科保持为空，`consent` 保持 false；不会用模型推测补齐。`PATCH /api/v1/me/profile` 仍保留给接口和旧客户端，前端不再提供画像填写页。
 3. 画像中的省份、年份、位次、三门选科齐全后，对话中的“用对话里的信息生成推荐”按钮会带上用户明确点击授权的 `consent=true`，调用 `POST /api/v1/recommendations`，使用新的 `profile_version_id`、`intent: "admission"`、问题和 `risk_preference: 50`，并携带 `Idempotency-Key`。规则暂仅覆盖浙江 2026 普通类。
 4. 抽屉通过已有 `/recommendations/{id}/events` SSE 观察进度，并读取 `/recommendations/{id}`；只有 `validation.status=passed` 的成功或部分完成任务才展示候选。来源与硬条件不明时保留“待确认”，硬条件失败项不进入候选。
@@ -35,3 +35,5 @@
 处理范围包括允许域内官方链接发现、静态 HTML/PDF/XLS/XLSX 抽取、原始资料与证据暂存、管理员批准及后续导入发布。它不会在部署后自动发布未经审核的数据，也不是全国院校数据的一键全量采集。
 
 本次修正首次部署时的启动顺序：构建镜像，启动并等待 PostgreSQL，在一次性 API 容器运行迁移，迁移成功后再启动 API、推荐 Worker、抓取 Worker 和前端。迁移失败时不继续启动新服务，避免抓取 Worker 在数据表尚未创建时耗掉首次启动尝试。完整 Docker 路径仍应在部署机器验证。
+
+星图默认位次、匿名筛选、浏览器咨询历史和 profile_context 说明见 [ATLAS-CONTEXT.md](ATLAS-CONTEXT.md)。关闭抽屉不再清空历史，匿名记录仅保存在本浏览器。

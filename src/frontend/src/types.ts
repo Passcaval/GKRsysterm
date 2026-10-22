@@ -111,7 +111,24 @@ export interface AdmissionKnowledgeSummary {
     createdAt: string;
   } | null;
 }
+export interface AtlasSearchResult {
+  items: School[];
+  basis: {
+    province: string;
+    rank: number;
+    year: number;
+    subjects: string[];
+    cities: string[];
+    majors: string[];
+    query: string;
+  };
+  rankedCount: number;
+  note: string;
+}
 export interface School {
+  referenceYear?: number;
+  referenceProvince?: string;
+  referenceMajor?: string;
   id: string;
   name: string;
   short: string;

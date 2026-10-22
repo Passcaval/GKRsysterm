@@ -290,7 +290,12 @@ export function SchoolCard({
       <div className="school-bottom">
         <span>
           历史位次 <b>{school.rank?.toLocaleString() ?? "待确认"}</b>
-          <small>示例 · 2025</small>
+          <small>
+            {isMock ? "示例" : "历史参考"} ·{" "}
+            {school.referenceYear ||
+              school.history.at(-1)?.year ||
+              "年份待核对"}
+          </small>
         </span>
         <button
           className="round-add"
