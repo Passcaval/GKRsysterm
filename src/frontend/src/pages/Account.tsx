@@ -1149,7 +1149,14 @@ export default function Account({ path }: { path: string }) {
   ) : path === "/admin/admissions" ? (
     <AdmissionsAdmin />
   ) : path === "/profile" ? (
-    <ProfilePage />
+    <Empty
+      text="考生档案已改为在领航员对话里自动整理，不需要再填表。"
+      action="回到启航并开始对话"
+      onAction={() => {
+        location.hash = "#/";
+        window.dispatchEvent(new Event("nv-open-chat"));
+      }}
+    />
   ) : path === "/lighthouse" ? (
     <Lighthouse />
   ) : path === "/admin" ? (

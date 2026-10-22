@@ -108,20 +108,15 @@ export function Me() {
           </div>
         </section>
         <section className="panel">
-          <h2>我的档案与探索</h2>
+          <h2>我的夜航与探索</h2>
           <p className="muted">
-            画像可以逐步补齐；保存后随时可以回来修改。风险分析会单独询问缺失条件和位次口径。
+            不用填表。直接和领航员聊聊，它会边聊边整理你的报考信息；需要补充时也会在对话里继续问你。
           </p>
-          {data.profile && (
-            <p className="muted">
-              当前画像：{data.profile.province || "省份待补充"} · 分数{" "}
-              {data.profile.score ?? "待补充"} · 位次{" "}
-              {data.profile.rank ?? "待补充"} · 版本{" "}
-              {data.profile.version ?? 0}
-            </p>
-          )}
-          <button className="button gold-button" onClick={() => navigate("/profile")}>
-            {data.profile ? "修改考生档案" : "填写考生档案"}
+          <button
+            className="button gold-button"
+            onClick={() => window.dispatchEvent(new Event("nv-open-chat"))}
+          >
+            去和领航员聊聊
           </button>
           <button className="button" onClick={() => navigate("/history")}>
             历史任务、偏好与案例授权

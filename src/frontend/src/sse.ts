@@ -46,6 +46,13 @@ export class EventDecoder {
           (typeof value.signalId !== "string" ||
             typeof value.question !== "string" ||
             !Number.isInteger(value.expectedVersion) ||
+            (value.applied !== undefined &&
+              typeof value.applied !== "boolean") ||
+            (value.profile !== undefined &&
+              (typeof value.profile !== "object" || value.profile === null)) ||
+            (value.conversationProfile !== undefined &&
+              (typeof value.conversationProfile !== "object" ||
+                value.conversationProfile === null)) ||
             !Array.isArray(value.changes) ||
             value.changes.some(
               (change: { field?: unknown; label?: unknown } | null) =>

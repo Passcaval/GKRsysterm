@@ -44,7 +44,7 @@ export default function History() {
       <PageTitle
         eyebrow="YOUR HISTORY, YOUR CHOICE"
         title="航行历史与偏好"
-        description="历史任务可以恢复。个人画像用途授权与跨用户案例共享授权相互独立，默认不共享。"
+        description="历史任务可以恢复。对话信息用途授权与跨用户案例共享授权相互独立，默认不共享。"
       />
       {!isMock && (
         <div className="notice amber">
@@ -71,7 +71,7 @@ export default function History() {
           >
             <span>{h.question}</span>
             <small>
-              {runLabels[h.status]} · {beijingTime(h.createdAt)} · 画像{" "}
+              {runLabels[h.status]} · {beijingTime(h.createdAt)} · 信息{" "}
               {h.profileVersionId || "无"}
             </small>
           </button>
@@ -170,7 +170,7 @@ export default function History() {
       <section className="panel">
         <h2>清除本人数据</h2>
         <p className="muted">
-          清除画像、收藏、草案、本人任务和共享授权；正式环境的审计保留边界由后端隐私规则确定。
+          清除对话信息、收藏、草案、本人任务和共享授权；正式环境的审计保留边界由后端隐私规则确定。
         </p>
         {clear ? (
           <>

@@ -10,27 +10,24 @@ import {
 } from "lucide-react";
 import { api, isMock } from "../api";
 import { Evidence, Modal } from "../components";
-import type {
-  ChatMessage,
-  Profile,
-  ProfileUpdateChange,
-  RecommendationRun,
-} from "../types";
+import type { ChatMessage, Profile, RecommendationRun } from "../types";
 import { useApp } from "../store";
 import { errorText, profileToWire } from "../transport";
-import NavigatorProfile from "../NavigatorProfile";
 import {
   missingForIntent,
   runLabels,
   terminalRuns,
   visibleRunItems,
 } from "../workflow-domain";
+const PROFILE_MISSING_LABELS: Record<string, string> = {
+  province_code: "生源省份",
+  exam_year: "报考年份",
+  subjects: "三门选考科目",
+  rank: "省内位次",
+};
 export default function Chat({ onClose }: { onClose: () => void }) {
   const { data, update, notify, navigate } = useApp();
   const owner = data.user?.id;
-  const [draftProposal, setDraftProposal] = useState<Partial<Profile> | null>(
-    null,
-  );
   const [runId, setRunId] = useState(() =>
     owner ? sessionStorage.getItem("nv-last-run:" + owner) || "" : "",
   );
@@ -49,13 +46,9 @@ export default function Chat({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
   const [conversation, setConversation] = useState<string>();
   const [evidence, setEvidence] = useState<string[] | null>(null);
-  const [profileProposal, setProfileProposal] = useState<{
-    signalId: string;
-    changes: ProfileUpdateChange[];
-    expectedVersion: number;
-    question: string;
-  } | null>(null);
-  const [resolvingProfile, setResolvingProfile] = useState(false);
+  const [conversationProfile, setConversationProfile] = useState<Profile | null>(
+    null,
+  );
   const controller = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -135,7 +128,6 @@ export default function Chat({ onClose }: { onClose: () => void }) {
       setRunId(next.runId);
       setWake((v) => v + 1);
       createKey.current = { body: "", key: "" };
-      setDraftProposal(null);
     } catch (e) {
       if (generation.current === current) setRunError(errorText(e));
     } finally {
@@ -161,28 +153,6 @@ export default function Chat({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     end.current?.scrollIntoView({ block: "nearest" });
   }, [messages]);
-  async function resolveProfile(decision: "confirm" | "reject") {
-    if (!profileProposal || resolvingProfile) return;
-    setResolvingProfile(true);
-    setError("");
-    try {
-      const result = await api.resolveProfileSignal(
-        profileProposal.signalId,
-        decision,
-        profileProposal.expectedVersion,
-      );
-      if (result.profile) update({ profile: result.profile });
-      notify(decision === "confirm" ? "考生画像已更新" : "已保留原画像");
-      setProfileProposal(null);
-      if (decision === "confirm" && result.profile)
-        await recommend(result.profile, false);
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setResolvingProfile(false);
-    }
-  }
-
   async function send() {
     const text = input.trim();
     if (!text || busy) return;
@@ -198,15 +168,6 @@ export default function Chat({ onClose }: { onClose: () => void }) {
     const c = new AbortController();
     controller.current = c;
     try {
-      if (!data.profile) {
-        try {
-          const parsed = await api.parseProfile(text);
-          if (Object.keys(parsed.proposedChanges).length)
-            setDraftProposal(parsed.proposedChanges);
-        } catch {
-          /* The structured form remains usable if parsing is unavailable. */
-        }
-      }
       for await (const e of api.chat(text, conversation, c.signal)) {
         if (e.type === "tool_start")
           setTrace((t) => [
@@ -233,26 +194,47 @@ export default function Chat({ onClose }: { onClose: () => void }) {
               i === m.length - 1 ? { ...x, sourceIds: e.sourceIds || [] } : x,
             ),
           );
-        if (
-          e.type === "profile_update" &&
-          e.signalId &&
-          e.changes &&
-          e.expectedVersion !== undefined
-        )
-          setProfileProposal({
-            signalId: e.signalId,
-            changes: e.changes,
-            expectedVersion: e.expectedVersion,
-            question: e.question || "",
-          });
+        if (e.type === "profile_update" && e.applied) {
+          if (e.profile) update({ profile: e.profile });
+          if (e.conversationProfile)
+            setConversationProfile(e.conversationProfile);
+          if (e.changes?.length) notify("已根据对话记下你的报考信息");
+        }
         if (e.type === "done") setConversation(e.conversationId);
       }
     } catch (e) {
+      setMessages((m) => {
+        const last = m.at(-1);
+        return last?.role === "assistant" && !last.text ? m.slice(0, -1) : m;
+      });
       if (!c.signal.aborted) setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
+  function resetChat() {
+    controller.current?.abort();
+    generation.current++;
+    setMessages([]);
+    setConversation(undefined);
+    setInput("");
+    setTrace([]);
+    setError("");
+    setEvidence(null);
+    setConversationProfile(null);
+    setRun(null);
+    setRunId("");
+    setRunBusy(false);
+    setRunError("");
+    if (owner) sessionStorage.removeItem("nv-last-run:" + owner);
+  }
+  const activeProfile = conversationProfile;
+  const profileMissing = activeProfile
+    ? missingForIntent(activeProfile, "admission").filter(
+        (field) => field !== "consent",
+      )
+    : ["province_code", "subjects", "rank"];
+  const profileReady = profileMissing.length === 0;
   return (
     <>
       <div className="chat-scrim" onClick={onClose} />
@@ -287,6 +269,13 @@ export default function Chat({ onClose }: { onClose: () => void }) {
             <small>数据有出处，建议有依据。</small>
           </div>
           <button
+            type="button"
+            className="text-button chat-reset"
+            onClick={resetChat}
+          >
+            清空对话
+          </button>
+          <button
             className="icon-button"
             onClick={onClose}
             aria-label="关闭领航员"
@@ -316,15 +305,33 @@ export default function Chat({ onClose }: { onClose: () => void }) {
             </div>
           </div>
           {data.user ? (
-            <NavigatorProfile
-              profile={data.profile}
-              proposal={draftProposal}
-              busy={runBusy || resolvingProfile}
-              onRecommend={recommend}
-            />
+            <div className="navigator-chat-guide">
+              <p className="muted">
+                不用填表。直接告诉我你的生源省份、位次、选考和想法，我会边聊边记下。
+              </p>
+              {profileReady ? (
+                <button
+                  className="button gold-button"
+                  disabled={runBusy}
+                  onClick={() =>
+                    void recommend({ ...activeProfile!, consent: true })
+                  }
+                >
+                  {runBusy ? "正在生成…" : "用对话里的信息生成推荐"}
+                </button>
+              ) : (
+                <p className="muted">
+                  还需要：
+                  {profileMissing
+                    .map((field) => PROFILE_MISSING_LABELS[field] || field)
+                    .join("、")}
+                  。直接告诉我就行。
+                </p>
+              )}
+            </div>
           ) : (
             <p className="notice amber">
-              登录后，填写省份、位次与选科即可在这里获得推荐。
+              登录后直接和领航员聊，就能边聊边整理报考信息并获得推荐。
               <button
                 className="text-button"
                 onClick={() => {
@@ -358,7 +365,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
                 领航员为你找到的方向 <small>{runLabels[run.status]}</small>
               </h3>
               {run.profileVersionId !== data.profile?.profileVersionId ? (
-                <p>画像已更新，请按上面的新信息更新推荐。</p>
+                <p>对话里的信息有更新，可以重新生成推荐。</p>
               ) : (
                 <>
                   {!terminalRuns.includes(run.status) && (
@@ -371,7 +378,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
                   {run.validation.status === "passed" && (
                     <>
                       <p className="muted">
-                        依据画像 v{data.profile?.version}。
+                        依据本次对话整理的信息。
                         {isMock
                           ? "当前为合成演示数据。"
                           : "来源为已发布招生资料。"}
@@ -460,7 +467,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
           {messages.map((m, i) => (
             <article key={i} className={`chat-message ${m.role}`}>
               <span className="message-role">
-                {m.role === "assistant" ? "✧ 领航员 · 模型生成" : "你"}
+                {m.role === "assistant" ? "✧ 领航员" : "你"}
               </span>
               <p>{m.text || "正在检索可用信息…"}</p>
               {m.sourceIds.length > 0 && (
@@ -507,43 +514,6 @@ export default function Chat({ onClose }: { onClose: () => void }) {
               </p>
             </div>
           )}
-          {profileProposal && (
-            <section className="notice amber profile-update-card" role="alert">
-              <p>{profileProposal.question}</p>
-              <ul>
-                {profileProposal.changes.map((change) => (
-                  <li key={change.field}>
-                    {change.label}：
-                    {change.old === null || change.old === ""
-                      ? "未填写"
-                      : String(change.old)}{" "}
-                    → {String(change.new)}
-                  </li>
-                ))}
-              </ul>
-              <p className="muted">
-                确认后会生成新的画像版本并更新推荐，原版本和推荐记录保留。
-              </p>
-              <div className="form-actions">
-                <button
-                  type="button"
-                  className="button gold-button"
-                  disabled={resolvingProfile}
-                  onClick={() => void resolveProfile("confirm")}
-                >
-                  {resolvingProfile ? "处理中…" : "确认并更新推荐"}
-                </button>
-                <button
-                  type="button"
-                  className="button"
-                  disabled={resolvingProfile}
-                  onClick={() => void resolveProfile("reject")}
-                >
-                  保持原样
-                </button>
-              </div>
-            </section>
-          )}
           <div ref={end} />
         </div>
         <form
@@ -553,22 +523,6 @@ export default function Chat({ onClose }: { onClose: () => void }) {
             void send();
           }}
         >
-          <button
-            type="button"
-            className="text-button"
-            onClick={() => {
-              sessionStorage.setItem(
-                "nv-run-question",
-                input ||
-                  messages.filter((m) => m.role === "user").at(-1)?.text ||
-                  "",
-              );
-              onClose();
-              navigate("/routes");
-            }}
-          >
-            转为可追溯推荐任务 <ArrowUpRight size={13} />
-          </button>
           <div className="chat-input">
             <input
               ref={field}

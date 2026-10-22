@@ -1,6 +1,8 @@
 import { ApiError, BASE, resetSession, onSessionReset } from "./transport";
 import { EventDecoder } from "./sse";
 import type { ChatEvent } from "./types";
+const FIRST_CHUNK_TIMEOUT_MS = 90_000;
+const IDLE_TIMEOUT_MS = 120_000;
 export async function* streamChat(
   message: string,
   conversationId: string | undefined,
@@ -11,7 +13,7 @@ export async function* streamChat(
   signal.addEventListener("abort", stop, { once: true });
   if (signal.aborted) stop();
   const dispose = onSessionReset(stop);
-  let timer = setTimeout(stop, 20000);
+  let timer = setTimeout(stop, FIRST_CHUNK_TIMEOUT_MS);
   try {
     const response = await fetch(BASE + "/chat/stream", {
       method: "POST",
@@ -44,7 +46,7 @@ export async function* streamChat(
     try {
       while (!signal.aborted) {
         clearTimeout(timer);
-        timer = setTimeout(stop, 30000);
+        timer = setTimeout(stop, IDLE_TIMEOUT_MS);
         const part = await reader.read();
         if (part.done) break;
         for (const e of parser.push(
@@ -66,6 +68,10 @@ export async function* streamChat(
       await reader.cancel().catch(() => {});
       reader.releaseLock();
     }
+  } catch (error) {
+    if (controller.signal.aborted && !signal.aborted)
+      throw new Error("等待模型回复超时，请重试");
+    throw error;
   } finally {
     clearTimeout(timer);
     dispose();

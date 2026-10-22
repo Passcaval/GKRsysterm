@@ -16,8 +16,8 @@
 | --- | --- |
 | 唯一登录页、角色权限与邮箱重输 | 已实现真实 Cookie 会话；后端返回 EMAIL_INVALID / IDENTIFIER_INVALID 及重新输入提示；真实模式不在浏览器提前拒绝邮箱 |
 | 注册申请、状态查询、管理员原文/原始音频审批 | 已实现；未批准不建正式账号；批准/驳回原子处理，预留ID不变、驳回释放自身占用；查询凭据使用请求头 |
-| 部分画像、版本、乐观锁 | 已实现；未填成绩/位次为null；初次expected_version=0，后续旧版本409；画像使用需确认consent |
-| 自然语言提取画像 | M2未接入；503 FEATURE_NOT_AVAILABLE，不伪造提取结果；可使用结构化档案 |
+| 部分画像、版本、乐观锁 | 已实现；未填成绩/位次为null；初次expected_version=0，后续旧版本409；对话可自动保存草稿，生成推荐仍需 consent=true |
+| 自然语言提取画像 | 已实现；`/chat/stream` 确定性提取明确信息并自动生成新版本；前端不再提供画像表单 |
 | 院校、招生单位、历史、来源详情、分页筛选 | 已实现；未知数据保留null；按学校筛选单位；仅当前已复核导入数据可发布 |
 | 异步推荐、补问、事件恢复、取消、反馈 | 已实现并与真实前端访问层联调；只有校验通过的结果进入页面 |
 | 草案与模拟 | 以招生单位/专业ID校验本人条目，版本锁；模拟仅检查已知条件，未知不等于通过，不执行真实投档 |
@@ -49,20 +49,19 @@ SSE 事件（`data: <JSON>`）：
 
 ## 领航员驱动的画像校准
 
-聊天消息不会静默改写画像。后端从用户消息中识别明确出现的生源省份、高考分数、省内位次和完整三门选科，与当前画像比较后生成 `chat_profile_signals` 待确认记录；记录同时保存本次检索的 `source_ids`，作为可审计的搜索反馈数据。
+画像不再通过表单填写。后端从用户消息中识别明确的生源省份、年份、分数、位次、完整三门选科、意向地域、专业和院校，自动合并为新的 `ProfileVersion`，同时写入 `chat_profile_signals` 作为可审计的搜索反馈；没有足够信息时保存为草稿，不用模型猜测补齐。
 
-- SSE 在模型回答前发送 `profile_update` 事件：`signal_id`、`changes`（`field`/`label`/`old`/`new`）、`expected_version`、`question`、`source_ids`。
-- 前端显示确认卡片，用户点击“确认并更新推荐”或“保持原样”后才提交。确认后在领航员内创建绑定新画像版本的推荐任务。
-- `POST /api/v1/chat/profile-signals/{signal_id}/resolve` 接收 `{decision:"confirm"|"reject", expected_version}`；确认时使用当前画像版本创建新的 `ProfileVersion`，原版本保留在画像历史中；版本冲突返回 409。
-- 该接口是后端专属，不改变共享 50 操作数量。信号允许修改明确识别出的生源省份、年份、分数、位次、选科、意向地域、专业和院校。想去的省份保存为地域偏好，不覆盖生源省份。
-- 用户在画像表单保存后可以随时再次进入 `/#/profile` 修改；`Me` 页提供“修改考生档案”入口。每次保存都生成新版本，推荐任务绑定创建时的画像版本。
+- SSE 在模型回答前发送 `profile_update` 事件：`signal_id`、`applied`、`profile`（全局画像快照）、`conversation_profile`（本会话画像）、`changes`（`field`/`label`/`old`/`new`）、`expected_version`、`question`、`source_ids`。新会话只合并本会话信号，不继承其他会话或全局画像中的旧字段。
+- 前端不再显示确认卡片；收到事件后直接更新全局画像，星图和推荐状态随之刷新。
+- `POST /api/v1/chat/profile-signals/{signal_id}/resolve` 仅保留给历史待确认信号；新对话不再产生 `proposed` 状态。想去的省份保存为地域偏好，不覆盖生源省份。
+- `PATCH /me/profile` 仍作为后端接口保留；前端不再提供 `/#/profile` 页面或“修改考生档案”入口。生成正式推荐时，前端按钮会明确以 `consent=true` 保存本次点击授权。
 
 ## 考生画像、模糊搜索与分支推荐
 
 个性化推荐至少需要**生源省份、报考年份、位次、三门选科和同意使用画像**。分数、意向省份/城市、意向院校、专业兴趣、学费预算、位次口径和报考批次为可选：
 
-- 前端画像表单允许先保存草稿；生成推荐时，缺少必需字段会返回 `waiting_input` 和补问，不会静默编造。
-- `POST /me/profile/parse` 已实现确定性识别，返回待确认修改，不保存画像。`preferred_schools` 是可选名称列表，前端对应 `preferredSchools`；地域、专业、院校用于偏好排序。完整首次推荐和补充流程见 [NAVIGATOR.md](NAVIGATOR.md)。
+- 对话可以自动保存草稿；生成推荐时，缺少必需字段会返回 `waiting_input` 和补问，不会静默编造。
+- `POST /me/profile/parse` 保留为后端兼容接口，返回识别建议但不保存；主流程通过 `/chat/stream` 自动应用明确信息。`preferred_schools` 是可选名称列表，前端对应 `preferredSchools`；地域、专业、院校用于偏好排序。完整首次推荐和补充流程见 [NAVIGATOR.md](NAVIGATOR.md)。
 - 缺少可选字段时推荐仍会执行，但所有相关硬条件标记为“待确认”，不会进入 `items` 合格候选，而是进入 `pending_confirmation`。
 - 结果额外返回 `missing_info`（缺失字段及补充建议）和 `branches`（最多三种策略分支：专业优先、地域优先、成本优先）。每个分支包含 `pros`、`cons`、`missing_fields` 和 `item_ids`，只引用同一次结果中已校验的候选；分支是不同排序视角，不是新的录取结论。
 - 结果最多展示最接近的 30 条合格候选和 30 条待确认候选；超出时提示补充偏好缩小范围。

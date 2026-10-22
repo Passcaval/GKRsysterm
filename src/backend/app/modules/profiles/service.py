@@ -4,7 +4,7 @@ from pydantic import Field, model_validator
 from sqlalchemy import select
 
 from app.core.errors import DomainError
-from app.db.models import ProfileVersion, User
+from app.db.models import ChatProfileSignal, ProfileVersion, User
 from app.modules.community.schemas import StrictModel
 
 
@@ -39,6 +39,23 @@ class ProfilePatch(StrictModel):
     profile: ProfileInput
 
 
+CHAT_PROFILE_DEFAULTS = {
+    "province": "",
+    "year": 2026,
+    "score": None,
+    "rank": None,
+    "subjects": [],
+    "cities": [],
+    "interests": [],
+    "schools": [],
+    "budget": None,
+    "acceptAdjustment": False,
+    "consent": False,
+    "rank_cohort": None,
+    "batch": None,
+}
+
+
 def recommendation_missing(profile: dict | None) -> list[tuple[str, str]]:
     p = profile or {}
     missing = []
@@ -71,10 +88,50 @@ def save_profile(db, owner_id, profile, expected_version=None):
     version = current.version if current else 0
     if expected_version is not None and version != expected_version:
         raise DomainError(409, "PROFILE_VERSION_CONFLICT", "画像已更新，请刷新后重试。")
-    record = ProfileVersion(owner_id=owner_id, version=version + 1, data=profile.model_dump())
+    payload = profile.model_dump() if hasattr(profile, "model_dump") else dict(profile)
+    record = ProfileVersion(owner_id=owner_id, version=version + 1, data=payload)
     db.add(record)
     db.flush()
     return record
+
+
+def merge_chat_values(base: dict | None, changes) -> dict:
+    values = {**CHAT_PROFILE_DEFAULTS, **(base or {})}
+    allowed = {"province", "year", "score", "rank", "subjects", "cities", "interests", "schools"}
+    for change in changes:
+        field = change.get("field")
+        if field in allowed:
+            values[field] = change.get("new")
+    return values
+
+
+def apply_chat_changes(db, owner_id, changes):
+    """Merge explicit chat facts into a draft profile without requiring a form.
+
+    The saved row is still an ordinary ProfileVersion.  Recommendations keep
+    checking for province/year/rank/subjects/consent, so a partial chat profile
+    is a draft, not a completed application.
+    """
+    db.scalar(select(User).where(User.id == owner_id).with_for_update())
+    current = current_profile(db, owner_id)
+    values = merge_chat_values(current.data if current else None, changes)
+    return save_profile(db, owner_id, values, current.version if current else 0)
+
+
+def conversation_profile(db, conversation_id) -> dict:
+    """Profile facts stated inside one conversation, independent of other chats."""
+    values: dict = {}
+    signals = db.scalars(
+        select(ChatProfileSignal)
+        .where(
+            ChatProfileSignal.conversation_id == conversation_id,
+            ChatProfileSignal.status == "confirmed",
+        )
+        .order_by(ChatProfileSignal.created_at, ChatProfileSignal.id)
+    )
+    for signal in signals:
+        values = merge_chat_values(values, signal.changes or [])
+    return values or dict(CHAT_PROFILE_DEFAULTS)
 
 
 def profile_view(record):

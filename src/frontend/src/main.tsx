@@ -106,13 +106,17 @@ function App() {
         setChat(true);
       }
     };
+    const openChat = () => setChat(true);
     window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+    window.addEventListener("nv-open-chat", openChat);
+    return () => {
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("nv-open-chat", openChat);
+    };
   }, []);
   const title =
     nav.find((n) => n.path === path)?.label ||
     {
-      "/profile": "考生档案",
       "/lighthouse": "灯塔计划",
       "/admin": "审核工作台",
       "/me": "我的夜航",
@@ -291,11 +295,11 @@ function App() {
         </header>
         <div
           className="journey-progress"
-          aria-label={`档案${data.profile ? "已建立" : "待完善"}，已加入${data.plan.entries.length}个志愿`}
+          aria-label={`已加入${data.plan.entries.length}个志愿`}
         >
           <span
             style={{
-              width: `${data.profile ? Math.min(100, 35 + data.plan.entries.length * 5) : 5}%`,
+              width: `${Math.min(100, 5 + data.plan.entries.length * 5)}%`,
             }}
           />
         </div>
