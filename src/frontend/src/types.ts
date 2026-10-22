@@ -98,6 +98,18 @@ export interface Source {
   freshness?: "current" | "expired" | "unknown";
   scope?: string | null;
 }
+export interface AdmissionKnowledgeSummary {
+  enabled: boolean;
+  configured: boolean;
+  sourceCount: number;
+  ttlHours: number;
+  latestJob: {
+    id: string;
+    status: string;
+    error: string | null;
+    createdAt: string;
+  } | null;
+}
 export interface School {
   id: string;
   name: string;

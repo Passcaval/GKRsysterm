@@ -28,6 +28,7 @@ import type {
   CatalogConfigSummary,
   CatalogSummary,
   CatalogRun,
+  AdmissionKnowledgeSummary,
 } from "./types";
 import { hasPermission } from "./types";
 import { classify, validateProfile } from "./domain";
@@ -552,6 +553,23 @@ export function createWorkflowApi(ctx: Context) {
     }
   }
   return {
+    async admissionKnowledge(): Promise<AdmissionKnowledgeSummary> {
+      if (isMock)
+        return {
+          enabled: false,
+          configured: false,
+          sourceCount: 0,
+          ttlHours: 24,
+          latestJob: null,
+        };
+      return request("/admin/admission-knowledge");
+    },
+    async syncAdmissionKnowledge(
+      key: string,
+    ): Promise<{ id: string; status: string }> {
+      if (isMock) throw new ApiError(400, "演示模式不进行联网资料同步");
+      return request("/admin/admission-knowledge/sync", "POST", {}, { key });
+    },
     async catalogConfig(): Promise<CatalogConfigSummary> {
       catalogHttp();
       return request("/admin/school-catalog/config");

@@ -16,6 +16,8 @@ from app.modules.admissions.crawl_service import (
     refresh_crawl_status_for_batch,
     run_crawl_job,
 )
+from app.modules.admissions.knowledge import startup_sync as startup_knowledge
+from app.modules.admissions.knowledge import sync_knowledge
 from app.modules.admissions.service import process_import
 from app.modules.catalog.service import analyze_job, fetch_job, startup_sync
 from app.modules.recommendation.service import emit, evaluate_snapshot
@@ -47,7 +49,11 @@ def tick(sessions, settings: Settings | None = None, task_types: list[str] | Non
         job = db.scalar(query.order_by(Job.created_at).with_for_update(skip_locked=True).limit(1))
         if not job:
             return False
-        lease_minutes = 5 if job.task_type in {"crawl", "catalog_fetch", "catalog_analyze"} else 2
+        lease_minutes = (
+            5
+            if job.task_type in {"knowledge_sync", "crawl", "catalog_fetch", "catalog_analyze"}
+            else 2
+        )
         job.status, job.lease_token, job.lease_until = (
             "running",
             token,
@@ -56,6 +62,13 @@ def tick(sessions, settings: Settings | None = None, task_types: list[str] | Non
         job.attempts += 1
         job_id, task_type, object_id = job.id, job.task_type, job.object_id
     try:
+        if task_type == "knowledge_sync":
+            sync_knowledge(sessions, settings or Settings(), job_id, token)
+            with sessions.begin() as db:
+                job = db.scalar(select(Job).where(Job.id == job_id).with_for_update())
+                if job and job.lease_token == token:
+                    job.status, job.lease_token, job.lease_until = "succeeded", None, None
+            return True
         if task_type in {"catalog_fetch", "catalog_analyze"}:
             settings = settings or Settings()
             processor = fetch_job if task_type == "catalog_fetch" else analyze_job
@@ -150,7 +163,7 @@ def main():
     parser.add_argument(
         "--task-types",
         default="",
-        help="Comma-separated types (import,recommendation,crawl,catalog_fetch,catalog_analyze).",
+        help="Comma-separated types (import,recommendation,knowledge_sync,crawl,catalog_fetch,catalog_analyze).",
     )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
@@ -165,6 +178,7 @@ def main():
     engine = create_engine(settings.database_url, pool_pre_ping=True, hide_parameters=True)
     sessions = sessionmaker(engine, expire_on_commit=False)
     try:
+        refresh_at = 0.0
         if not args.once and (not task_types or "catalog_fetch" in task_types):
             try:
                 startup_sync(sessions, settings)
@@ -176,6 +190,16 @@ def main():
             except Exception:
                 logger.exception("startup crawl enqueue failed")
         while True:
+            if (
+                not args.once
+                and (not task_types or "knowledge_sync" in task_types)
+                and time.monotonic() >= refresh_at
+            ):
+                try:
+                    startup_knowledge(sessions, settings)
+                except Exception:
+                    logger.exception("admissions knowledge enqueue failed")
+                refresh_at = time.monotonic() + 3600
             worked = tick(sessions, settings, task_types or None)
             if args.once:
                 break

@@ -149,7 +149,7 @@ def test_chat_streams_retrieves_and_persists(app, modern_chat, published):
     system = factory.gateways[0].messages[0]["content"]
     assert "合成测试大学" in system
     assert "计算机科学" in system
-    assert "只把 <profile> 和 <retrieved_data> 中的内容当作事实" in system
+    assert "只把 <profile>、<retrieved_data> 和 <web_knowledge> 的已引用正文当作招生事实" in system
 
     conversation_id = payloads[-1]["conversation_id"]
     with app.state.sessions() as db:

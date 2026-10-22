@@ -34,10 +34,25 @@ class Settings(BaseSettings):
 
     # OpenAI-compatible model gateway. Empty strings are normalised to None.
     model_base_url: str | None = None
-    model_api_key: str | None = None
+    model_api_key: str | None = Field(default=None, repr=False)
     model_name: str | None = None
     model_timeout_seconds: float = Field(default=60, ge=1, le=300)
     model_max_output_tokens: int = Field(default=4000, ge=256, le=32000)
+    admission_knowledge_enabled: bool = True
+    admission_knowledge_auto_sync: bool = True
+    admission_knowledge_ttl_hours: int = Field(default=24, ge=1, le=168)
+    admission_knowledge_timeout_seconds: float = Field(default=20, ge=1, le=60)
+    admission_knowledge_results: int = Field(default=5, ge=1, le=8)
+
+    @property
+    def knowledge_configured(self) -> bool:
+        from urllib.parse import urlparse
+
+        return bool(
+            self.admission_knowledge_enabled
+            and self.model_configured
+            and urlparse(self.model_base_url).hostname == "api.deepseek.com"
+        )
 
     @field_validator("source_hosts")
     @classmethod

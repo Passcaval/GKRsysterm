@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import CatalogAdmin from "./CatalogAdmin";
+import KnowledgeAdmin from "./KnowledgeAdmin";
 import { api, isMock } from "../api";
 import { Empty } from "../components";
 import { useApp } from "../store";
@@ -69,8 +70,8 @@ export default function AdmissionsAdmin() {
 
   const provinceCrawlEnabled = Boolean(
     sources?.config &&
-      (sources.config.discovery.enabled ||
-        sources.config.sources.some((source) => source.enabled)),
+    (sources.config.discovery.enabled ||
+      sources.config.sources.some((source) => source.enabled)),
   );
 
   useEffect(() => {
@@ -83,8 +84,8 @@ export default function AdmissionsAdmin() {
         setSources(config);
         const enabled = Boolean(
           config.config &&
-            (config.config.discovery.enabled ||
-              config.config.sources.some((source) => source.enabled)),
+          (config.config.discovery.enabled ||
+            config.config.sources.some((source) => source.enabled)),
         );
         if (!enabled) return;
         const page = await api.crawlRuns();
@@ -243,10 +244,11 @@ export default function AdmissionsAdmin() {
     return (
       <section className="panel" aria-labelledby="data-management-title">
         <h1 id="data-management-title">院校资料管理</h1>
+        <KnowledgeAdmin />
         <CatalogAdmin />
         <p className="muted">
-          当前只启用全国院校基础资料同步。浙江招生计划抓取已在
-          config/admission_sources.json 中关闭。
+          全国院校名录负责基础资料；具体招生信息由联网知识库检索。
+          旧的浙江招生页面爬虫保持关闭，结构化招生单位仍需审核后发布。
         </p>
         {sources?.configError && (
           <p className="warning-text" role="alert">
@@ -265,6 +267,7 @@ export default function AdmissionsAdmin() {
   return (
     <section className="panel" aria-labelledby="data-management-title">
       <h1 id="data-management-title">院校资料管理</h1>
+      <KnowledgeAdmin />
       <CatalogAdmin />
       <div className="section-title">
         <div>

@@ -16,6 +16,7 @@ from app.core.model import ModelCallFailed, ModelGateway, ModelNotConfigured
 from app.core.security import optional_user, throttle
 from app.db.models import ChatProfileSignal, Conversation, now
 from app.db.session import get_db
+from app.modules.admissions.knowledge import knowledge_context, retrieve_knowledge, search_query
 from app.modules.agent.profile_signals import (
     extract_profile_changes,
     signal_applied_question,
@@ -200,6 +201,7 @@ def chat(data: ChatInput, request: Request, user=Depends(optional_user), db=Depe
     def stream():
         chunks: list[str] = []
         saved = False
+        stream_messages = messages
         try:
             yield _event(
                 {
@@ -235,6 +237,35 @@ def chat(data: ChatInput, request: Request, user=Depends(optional_user), db=Depe
                         "text": "未匹配到招生计划或全国院校名录数据",
                     }
                 )
+            web_query = search_query(data.message, conversation_values, terms)
+            if settings.knowledge_configured and web_query:
+                yield _event(
+                    {"type": "tool_start", "tool": "web_search", "text": "联网查找官方招生资料"}
+                )
+                try:
+                    with sessions.begin() as web_db:
+                        web_sources = retrieve_knowledge(web_db, settings, web_query)
+                        web_context = knowledge_context(web_sources)
+                        source_ids.extend(
+                            str(s.id) for s in web_sources if str(s.id) not in source_ids
+                        )
+                    stream_messages = build_messages(
+                        conversation_values,
+                        context,
+                        history,
+                        data.message,
+                        school_context=school_context,
+                        missing_fields=missing_fields,
+                        web_context=web_context,
+                    )
+                    text = (
+                        f"取得 {len(web_sources)} 份官方网页正文，回答附原始出处"
+                        if web_sources
+                        else "未取得可引用的招生正文，不用搜索摘要替代事实"
+                    )
+                except DomainError:
+                    text = "联网资料暂不可用，继续依据已有资料回答"
+                yield _event({"type": "tool_end", "tool": "web_search", "text": text})
             if source_ids:
                 yield _event({"type": "evidence", "source_ids": source_ids})
             if event_signal_id is not None:
@@ -254,7 +285,7 @@ def chat(data: ChatInput, request: Request, user=Depends(optional_user), db=Depe
 
             try:
                 for delta in gateway.stream_text(
-                    messages,
+                    stream_messages,
                     max_tokens=max(settings.model_max_output_tokens, 8000),
                     temperature=0.3,
                 ):

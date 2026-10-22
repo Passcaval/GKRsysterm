@@ -46,9 +46,8 @@ export default function Chat({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState("");
   const [conversation, setConversation] = useState<string>();
   const [evidence, setEvidence] = useState<string[] | null>(null);
-  const [conversationProfile, setConversationProfile] = useState<Profile | null>(
-    null,
-  );
+  const [conversationProfile, setConversationProfile] =
+    useState<Profile | null>(null);
   const controller = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -277,7 +276,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
           </span>
           <div>
             <h2>你的夜航领航员</h2>
-            <small>数据有出处，建议有依据。</small>
+            <small>支持联网查询招生资料，点击来源核对。</small>
           </div>
           <button
             type="button"
