@@ -6,6 +6,114 @@
     "description": "M0–M1实际API，采用v0.4共享DTO；M2–M4未开放功能明确返回FEATURE_NOT_AVAILABLE。后台导入接口为新增操作。"
   },
   "paths": {
+    "/api/v1/admin/admission-knowledge": {
+      "get": {
+        "tags": [
+          "admissions knowledge"
+        ],
+        "summary": "Status",
+        "operationId": "status_api_v1_admin_admission_knowledge_get",
+        "responses": {
+          "200": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "request_id"
+                  ],
+                  "properties": {
+                    "data": {},
+                    "request_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/admission-knowledge/sync": {
+      "post": {
+        "tags": [
+          "admissions knowledge"
+        ],
+        "summary": "Sync",
+        "operationId": "sync_api_v1_admin_admission_knowledge_sync_post",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Origin",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "request_id"
+                  ],
+                  "properties": {
+                    "data": {},
+                    "request_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "后台接口，字段见 BACKEND.md",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health",
@@ -12640,6 +12748,12 @@
           "review"
         ],
         "title": "Summary"
+      },
+      "SyncInput": {
+        "properties": {},
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SyncInput"
       },
       "ValidationError": {
         "properties": {

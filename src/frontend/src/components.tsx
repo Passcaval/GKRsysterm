@@ -159,7 +159,10 @@ export function Evidence({ ids }: { ids: string[] }) {
                   : s.kind === "experience"
                     ? "学生体验"
                     : "模型 / 规则推断"}{" "}
-                · {s.year}
+                ·{" "}
+                {s.origin === "deepseek_search"
+                  ? "查询范围 " + s.year + " · 原文年份请核对"
+                  : s.year}
               </span>
               <h4>{s.title}</h4>
               <p>{s.excerpt}</p>

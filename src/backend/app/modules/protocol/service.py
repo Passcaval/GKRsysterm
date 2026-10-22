@@ -284,7 +284,9 @@ def source_view(db, source_id):
         missing()
     return {
         "id": str(item.id),
-        **wire(item.data),
+        **wire(
+            {key: value for key, value in item.data.items() if key not in {"body", "query_hash"}}
+        ),
         "content_hash": item.content_hash,
         "version": item.content_hash,
         "support_status": "unverified",
