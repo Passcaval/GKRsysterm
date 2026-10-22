@@ -60,13 +60,21 @@ def test_search_rejects_nonofficial_and_unsafe_urls(url):
 
 
 def test_query_omits_contact_details_and_is_bounded():
-    query = knowledge.search_query("邮箱 a@b.test 手机13800138000 位次33226 浙江大学选科", {}, [])
+    query = knowledge.search_query(
+        "邮箱 a@b.test 手机13800138000 位次33226 浙江大学选科",
+        {},
+        ["13800138000", "a@b.test", "33226"],
+    )
     assert "13800138000" not in query and "a@b.test" not in query and "33226" not in query
     normalized = knowledge.normalized_query(query * 20)
     assert len(normalized) <= 128
     assert "site:edu.cn" in normalized
     assert knowledge.search_query("你好", {}, []) is None
     assert knowledge.search_query("查询2025年浙江投档分", {"year": 2026}, []).startswith("2025 ")
+    detailed = "2026年浙江大学本科招生章程中的学费标准"
+    assert detailed in knowledge.normalized_query(
+        knowledge.search_query(detailed, {"schools": ["很长的偏好院校名称"] * 2}, ["模糊词"] * 3)
+    )
 
 
 def test_search_fetches_body_and_never_uses_only_summary(app):

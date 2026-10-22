@@ -62,9 +62,16 @@ def search_query(message: str, profile: dict, terms: list[str]) -> str | None:
     )
     years = re.findall(r"20\d{2}", message)
     year = years[-1] if years else profile.get("year") or 2026
-    values = [str(year), profile.get("province") or "", *profile.get("schools", [])[:2]]
-    values += [*profile.get("interests", [])[:2], *terms[:3], clean[:45]]
-    return " ".join(str(v) for v in values if v) + " 招生"
+    # Put the actual question first so the provider's query limit cannot trim
+    # away the school or requested fact behind fuzzy local-database keywords.
+    values = [str(year), clean[:60], profile.get("province") or ""]
+    values += [*profile.get("schools", [])[:2], *profile.get("interests", [])[:2], *terms[:3]]
+    query = " ".join(str(v) for v in values if v) + " 招生"
+    # Derived terms can also contain the original email/phone/rank.
+    query = re.sub(r"\S+@\S+|https?://\S+", " ", query)
+    return re.sub(
+        r"\d{3,}", lambda m: m.group() if re.fullmatch(r"20\d{2}", m.group()) else " ", query
+    )
 
 
 def normalized_query(query: str) -> str:
