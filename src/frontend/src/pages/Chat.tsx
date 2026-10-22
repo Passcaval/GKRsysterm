@@ -244,6 +244,7 @@ export default function Chat({
     }
   }
   function resetChat() {
+    setBusy(false);
     chatTurn.current++;
     controller.current?.abort();
     generation.current++;
