@@ -2,4 +2,10 @@
 
 统一维护在[共享接口规范](../../../docs/contracts/API.md)，机器契约见[OpenAPI](openapi.json)。50个HTTP操作、48个Schema覆盖注册申请与独立审批、统一登录、版本画像、异步任务及恢复、证据、反馈、招生单位与个人授权。新规范整体采用snake_case和request_id；旧v0.1成功DTO不可直接使用。
 
-运行 `pnpm run contract` 同时生成两份相同OpenAPI；`pnpm run contract:check`无写入地检查产物一致性。迁移说明见[技术方案对齐记录](TECHNICAL-ALIGNMENT.md)。本仓库没有真实后端，生产联调尚待双方完成。
+运行 `pnpm run contract` 同时生成两份相同OpenAPI；`pnpm run contract:check`无写入地检查产物一致性。迁移说明见[技术方案对齐记录](TECHNICAL-ALIGNMENT.md)，后端实现及验证边界见[后端对接说明](../../../docs/contracts/BACKEND.md)。
+
+## 院校星图的展示坐标（2026-10-21）
+
+接口与 DTO 未变。全国院校名录中 `School.x/y` 可能都是默认的 `50/50`，前端不再将它们直接当作页面坐标，也不按全校 `rank` 推断招生单位风险。星图使用 `School.id` 关联院校，依据容器宽高和名称所需空间在本地排布；追加分页保持已有院校顺序，筛选与屏幕尺寸变化会重新排布。院校多时通过画布滚动浏览。
+
+院校标记、停靠船只、划船动画的起点和终点共用这份布局；布局不回写后端。名称使用完整 `School.name`，长名称最多显示两行，点击信息卡可查看全文；完整名称也保留在无障碍标签和悬停提示中。`School.short` 保留在兼容 DTO 中，但不再生成院校名称旁的圆圈或金色简称装饰。

@@ -1295,19 +1295,6 @@ kbd {
   padding: 0;
   min-width: 0;
 }
-.school-seal {
-  display: grid;
-  place-items: center;
-  border: 1px solid;
-  border-radius: 50%;
-  height: 40px;
-  width: 40px;
-  flex-shrink: 0;
-  font-family: "Noto Serif SC", SimSun, serif;
-  font-size: 20px;
-  outline: 1px solid #ffffff12;
-  outline-offset: 3px;
-}
 .school-identity h3 {
   font-size: 14px;
   line-height: 1.6;
@@ -1703,12 +1690,6 @@ kbd {
   padding: 25px 0 45px;
   border-bottom: 1px solid var(--line);
   margin-bottom: 30px;
-}
-.school-seal.big {
-  width: 86px;
-  height: 86px;
-  font-size: 42px;
-  outline-offset: 6px;
 }
 .school-cover h1 {
   font-size: 34px;
@@ -3413,11 +3394,6 @@ kbd {
   .school-identity h3 {
     font-size: 12px;
   }
-  .school-seal {
-    width: 32px;
-    height: 32px;
-    font-size: 17px;
-  }
   .school-identity small {
     font-size: 8px;
   }
@@ -3520,11 +3496,6 @@ kbd {
   .school-cover {
     gap: 23px;
     padding: 20px 0 30px;
-  }
-  .school-seal.big {
-    width: 64px;
-    height: 64px;
-    font-size: 32px;
   }
   .school-cover h1 {
     font-size: 28px;
@@ -3754,11 +3725,6 @@ kbd {
   .school-meta {
     font-size: 11px;
   }
-  .school-seal {
-    width: 40px;
-    height: 40px;
-    font-size: 21px;
-  }
   .school-identity small {
     font-size: 10px;
   }
@@ -3825,11 +3791,6 @@ kbd {
   }
   .school-cover p > span {
     padding-left: 6px;
-  }
-  .school-seal.big {
-    height: 52px;
-    width: 52px;
-    font-size: 27px;
   }
   .school-cover {
     gap: 20px;

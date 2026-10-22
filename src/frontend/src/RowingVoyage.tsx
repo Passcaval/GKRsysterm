@@ -61,6 +61,22 @@ export function RowingVoyage({
       easing: "cubic-bezier(.32,.05,.25,1)",
       fill: "forwards",
     });
+    const viewport = node.closest<HTMLElement>(".map-body");
+    let cameraFrame = 0;
+    const followBoat = () => {
+      if (!active || finished || !viewport) return;
+      const view = viewport.getBoundingClientRect();
+      const boat = node.getBoundingClientRect();
+      const x = boat.left + boat.width / 2 - view.left;
+      const y = boat.top + boat.height / 2 - view.top;
+      // Keep long voyages visible when the constellation extends below a phone.
+      if (x < 70 || x > view.width - 70)
+        viewport.scrollLeft += x - view.width / 2;
+      if (y < 90 || y > view.height - 90)
+        viewport.scrollTop += y - view.height / 2;
+      cameraFrame = requestAnimationFrame(followBoat);
+    };
+    cameraFrame = requestAnimationFrame(followBoat);
     animation.finished.then(finish).catch(() => {});
     const preferenceChanged = () => {
       if (reduced.matches) finish();
@@ -69,6 +85,7 @@ export function RowingVoyage({
     return () => {
       active = false;
       animation.cancel();
+      cancelAnimationFrame(cameraFrame);
       reduced.removeEventListener("change", preferenceChanged);
     };
   }, [from.x, from.y, to.x, to.y]);

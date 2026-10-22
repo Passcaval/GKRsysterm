@@ -1,0 +1,239 @@
+/* The measured canvas owns constellation geometry at every breakpoint. */
+.drawer-layout.atlas-page main {
+  padding: 0;
+  max-width: none;
+}
+.home-columns > *,
+.star-map {
+  min-width: 0;
+}
+.star-map .map-body {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #bba67555 transparent;
+  touch-action: pan-x pan-y;
+}
+.star-map .map-body:focus-visible {
+  outline: 1px solid #d7ba78;
+  outline-offset: -3px;
+}
+.star-map .map-canvas {
+  position: relative;
+  isolation: isolate;
+}
+.star-map .map-lines {
+  overflow: hidden;
+}
+.star-map .map-nodes {
+  inset: 0 auto auto 0;
+  transform-origin: top left;
+}
+.star-map .star-node {
+  height: 104px;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  transform: translate(-50%, -50%);
+  border-radius: 8px;
+}
+.star-map .star-node:hover {
+  transform: translate(-50%, -50%);
+}
+.star-map .star-node:focus-visible {
+  outline: 1px solid #d7ba78;
+  outline-offset: 2px;
+}
+.drawer-layout .star-map .star-glow {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.star-map .star-glow > span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 12px 2px currentColor;
+}
+.star-map .docked-star > img {
+  position: absolute;
+  width: 27px;
+  height: 38px;
+  max-width: none;
+  object-fit: contain;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 7px #e5c27d55);
+}
+.star-map .star-node .star-name {
+  position: static;
+  transform: none;
+  margin: 0;
+  width: 100%;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.5;
+  font-size: 12px;
+}
+.star-map.fullscreen .star-node .star-name {
+  font-size: 13px;
+}
+.star-map .star-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.star-map .star-node .star-name small {
+  display: block;
+  font-size: 10px;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.star-map .position-label {
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  text-align: center;
+  white-space: normal;
+  width: 140px;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.star-map .map-bottom {
+  gap: 12px;
+}
+.map-scroll-hint,
+.map-browse-note {
+  color: #a9b2c0;
+  font-size: 11px;
+}
+.map-scroll-hint {
+  margin-left: auto;
+}
+.atlas-shell .star-map.fullscreen .map-body {
+  inset: 164px 24px 145px;
+  height: auto;
+  border-radius: 12px;
+}
+.atlas-shell .star-map.fullscreen .map-top {
+  top: 133px;
+}
+.atlas-shell .star-map.fullscreen .map-bottom {
+  bottom: 90px;
+}
+.atlas-selection {
+  max-height: calc(100dvh - 180px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.sailing-status > div {
+  min-width: 0;
+}
+.sailing-status strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.school-identity > span,
+.school-cover > div,
+.campus-board-layout > *,
+.campus-info-card {
+  min-width: 0;
+}
+.school-identity h3,
+.school-cover h1,
+.campus-info-card h2,
+.campus-info-card > .muted {
+  overflow-wrap: anywhere;
+}
+.school-cover p,
+.campus-coordinate,
+.campus-sky-meta {
+  flex-wrap: wrap;
+}
+.campus-info-card dl > div {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+}
+.campus-info-card dd {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .atlas-shell .star-map.fullscreen .map-body {
+    inset: 145px 12px 190px;
+  }
+  .atlas-shell .star-map.fullscreen .map-bottom {
+    bottom: 130px;
+    left: 20px;
+    right: 20px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .atlas-shell .star-map.fullscreen .map-top {
+    top: 114px;
+  }
+  .star-map.fullscreen .star-node .star-name {
+    font-size: 12px;
+  }
+  .star-map .map-scroll-hint,
+  .star-map .map-browse-note {
+    font-size: 10px;
+  }
+  .atlas-selection {
+    max-height: calc(100dvh - 210px);
+    bottom: 125px;
+  }
+  .atlas-load-more {
+    bottom: 80px;
+    padding: 4px;
+    width: max-content;
+  }
+  .atlas-load-more .button {
+    padding: 8px 12px;
+    min-height: 32px;
+    font-size: 10px;
+  }
+  .sailing-status {
+    width: calc(100% - 32px);
+    padding: 12px;
+    gap: 8px;
+  }
+  .sailing-status > svg,
+  .sailing-status > button {
+    flex-shrink: 0;
+  }
+  .sailing-status > div {
+    flex: 1;
+  }
+  .sailing-status .text-button {
+    margin-left: 0;
+  }
+}
+@media (max-height: 600px) and (min-width: 600px) {
+  .atlas-shell .star-map.fullscreen .map-body {
+    inset: 84px 12px 132px;
+  }
+  .atlas-shell .star-map.fullscreen .map-bottom {
+    bottom: 80px;
+  }
+  .atlas-load-more {
+    bottom: 15px;
+    left: 20px;
+    transform: none;
+    padding: 4px;
+  }
+  .atlas-disclaimer {
+    left: 245px;
+    max-width: calc(100% - 420px);
+  }
+}
