@@ -1,3 +1,4 @@
+import type { Profile } from "./types";
 import { ApiError, BASE, resetSession, onSessionReset } from "./transport";
 import { EventDecoder } from "./sse";
 import type { ChatEvent } from "./types";
@@ -8,6 +9,7 @@ export async function* streamChat(
   conversationId: string | undefined,
   signal: AbortSignal,
   history?: { role: "user" | "assistant"; content: string }[],
+  profileContext?: Profile | null,
 ): AsyncGenerator<ChatEvent> {
   const controller = new AbortController();
   const stop = () => controller.abort();
@@ -29,6 +31,19 @@ export async function* streamChat(
         message,
         conversation_id: conversationId,
         ...(history?.length ? { history } : {}),
+        ...(profileContext
+          ? {
+              profile_context: {
+                province: profileContext.province,
+                year: profileContext.year,
+                rank: profileContext.rank,
+                subjects: profileContext.subjects,
+                cities: profileContext.cities,
+                interests: profileContext.interests,
+                schools: profileContext.preferredSchools || [],
+              },
+            }
+          : {}),
       }),
     });
     if (!response.ok || !response.body) {

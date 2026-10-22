@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Request
@@ -63,10 +63,29 @@ class ChatTurn(StrictModel):
     content: str = Field(min_length=1, max_length=4000)
 
 
+class ChatContext(StrictModel):
+    province: str = Field(default="", max_length=30)
+    year: int = Field(default=2026, ge=2000, le=2100)
+    rank: int | None = Field(default=None, ge=1, le=5000000)
+    subjects: list[Literal["物理", "化学", "生物", "政治", "历史", "地理", "技术"]] = Field(
+        default_factory=list, max_length=3
+    )
+    cities: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
+        default_factory=list, max_length=5
+    )
+    interests: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
+        default_factory=list, max_length=5
+    )
+    schools: list[Annotated[str, Field(min_length=1, max_length=80)]] = Field(
+        default_factory=list, max_length=5
+    )
+
+
 class ChatInput(StrictModel):
     message: str = Field(min_length=1, max_length=4000)
     conversationId: UUID | None = None
     history: list[ChatTurn] = Field(default_factory=list, max_length=8)
+    profile_context: ChatContext | None = None
 
 
 def _event(payload: dict) -> str:
@@ -94,7 +113,9 @@ def chat(data: ChatInput, request: Request, user=Depends(optional_user), db=Depe
         conversation = None
         profile_record = None
         prior_conversation = merge_chat_values(None, [])
-        for turn in data.history:
+        if data.profile_context:
+            prior_conversation.update(data.profile_context.model_dump(exclude_none=True))
+        for turn in [] if data.profile_context else data.history:
             if turn.role == "user":
                 prior_conversation = merge_chat_values(
                     prior_conversation,

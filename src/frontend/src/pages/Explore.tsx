@@ -19,6 +19,8 @@ import { layoutAtlas } from "../atlas-layout";
 import type { School } from "../types";
 import { VoyageScene } from "../VoyageScene";
 import voyagerTop from "../assets/voyager-top.png";
+import { atlasContext } from "../navigator-state";
+import { useAtlasResults } from "../atlas-results";
 import { RowingVoyage } from "../RowingVoyage";
 export function StarMap({
   schools,
@@ -39,7 +41,11 @@ export function StarMap({
   sailingTo?: School | null;
   onArrive?: () => void;
 }) {
-  const { data, navigate } = useApp();
+  const { data, navigator, navigate } = useApp();
+  const uniqueSchools = useMemo(
+    () => [...new Map(schools.map((s) => [s.id, s])).values()],
+    [schools],
+  );
   const [zoom, setZoom] = useState(1);
   const [dockedInfo, setDockedInfo] = useState<School | null>(null);
   useEffect(() => {
@@ -106,24 +112,24 @@ export function StarMap({
         });
     });
   }
-  const rank = data.profile?.rank ?? null;
+  const rank = navigator.profile?.rank ?? data.profile?.rank ?? 8000;
   const mapTier = (s: School) =>
     isMock ? classify(rank, s.rank) : s.historicalRisk || "unknown";
   const docked =
     dockedInfo ||
-    schools.find((s) => s.id === dockedSchoolId) ||
+    uniqueSchools.find((s) => s.id === dockedSchoolId) ||
     data.schools.find((s) => s.id === dockedSchoolId);
   const layout = useMemo(
     () =>
       layoutAtlas(
-        [...schools, ...(docked ? [docked] : [])],
+        [...uniqueSchools, ...(docked ? [docked] : [])],
         size.width,
         size.height,
         !docked,
       ),
-    [schools, docked, size.width, size.height],
+    [uniqueSchools, docked, size.width, size.height],
   );
-  const firstSchoolId = schools[0]?.id;
+  const firstSchoolId = uniqueSchools[0]?.id;
   useEffect(() => {
     viewport.current?.scrollTo(0, 0);
   }, [firstSchoolId]);
@@ -134,7 +140,7 @@ export function StarMap({
   const boatPosition = percent(
     (docked && layout.positions.get(docked.id)) || layout.boat,
   );
-  const dockVisible = schools.some((s) => s.id === docked?.id);
+  const dockVisible = uniqueSchools.some((s) => s.id === docked?.id);
   const sailingPosition = sailingTo && layout.positions.get(sailingTo.id);
   function locateBoat() {
     const point = (docked && layout.positions.get(docked.id)) || layout.boat;
@@ -170,9 +176,7 @@ export function StarMap({
         <span>
           <span className="live-dot" /> 你的院校探索图
         </span>
-        <span>
-          院校位置与层次 · {isMock ? "示例分布" : "探索布局"}
-        </span>
+        <span>院校位置与层次 · {isMock ? "示例分布" : "探索布局"}</span>
       </div>
       <div
         className="map-body"
@@ -209,7 +213,7 @@ export function StarMap({
                 onArrive={() => onArrive?.()}
               />
             )}
-            {!dockVisible && (
+            {!dockVisible && !sailingTo && (
               <button
                 className={`voyager-position ${sailingTo ? "vessel-departed" : ""}`}
                 style={{
@@ -227,7 +231,7 @@ export function StarMap({
                 </span>
               </button>
             )}
-            {schools.map((s) => (
+            {uniqueSchools.map((s) => (
               <button
                 className={`star-node ${mapTier(s)} ${selectedSchoolId === s.id ? "selected" : ""}`}
                 data-school-id={s.id}
@@ -314,7 +318,10 @@ export function StarMap({
   );
 }
 export function Home({ openChat }: { openChat: () => void }) {
-  const { data, navigate } = useApp();
+  const { data, navigator, navigate } = useApp();
+  const atlas = useAtlasResults(
+    atlasContext(navigator.profile || data.profile),
+  );
   const [question, setQuestion] = useState("");
   function ask(text: string) {
     sessionStorage.setItem("nv-question", text);
@@ -398,7 +405,12 @@ export function Home({ openChat }: { openChat: () => void }) {
               探索全部院校
             </LinkButton>
           </SectionTitle>
-          <StarMap schools={data.schools} small />
+          <StarMap schools={atlas.value?.items || []} small />
+          <p className="muted" role="status">
+            {atlas.loading
+              ? "正在展开位次附近的院校…"
+              : atlas.error || atlas.value?.note}
+          </p>
         </section>
         <section className="profile-snapshot">
           <div className="snapshot-top">

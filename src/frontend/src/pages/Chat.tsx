@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type SetStateAction } from "react";
 import {
   Sparkles,
   X,
@@ -25,8 +25,14 @@ const PROFILE_MISSING_LABELS: Record<string, string> = {
   subjects: "三门选考科目",
   rank: "省内位次",
 };
-export default function Chat({ onClose }: { onClose: () => void }) {
-  const { data, update, notify, navigate } = useApp();
+export default function Chat({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  const { data, update, notify, navigate, navigator, setNavigator } = useApp();
   const owner = data.user?.id;
   const [runId, setRunId] = useState(() =>
     owner ? sessionStorage.getItem("nv-last-run:" + owner) || "" : "",
@@ -37,17 +43,27 @@ export default function Chat({ onClose }: { onClose: () => void }) {
   const [wake, setWake] = useState(0);
   const generation = useRef(0);
   const createKey = useRef({ body: "", key: "" });
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
+  const messages = navigator.messages;
+  const setMessages = (value: SetStateAction<ChatMessage[]>) =>
+    setNavigator((s) => ({
+      ...s,
+      messages: typeof value === "function" ? value(s.messages) : value,
+    }));
+  const input = navigator.input;
+  const setInput = (input: string) => setNavigator((s) => ({ ...s, input }));
+  const chatTurn = useRef(0);
   const [busy, setBusy] = useState(false);
   const [trace, setTrace] = useState<
     { tool: string; text: string; done: boolean }[]
   >([]);
   const [error, setError] = useState("");
-  const [conversation, setConversation] = useState<string>();
+  const conversation = navigator.conversationId;
+  const setConversation = (conversationId: string | undefined) =>
+    setNavigator((s) => ({ ...s, conversationId }));
   const [evidence, setEvidence] = useState<string[] | null>(null);
-  const [conversationProfile, setConversationProfile] =
-    useState<Profile | null>(null);
+  const conversationProfile = navigator.profile;
+  const setConversationProfile = (profile: Profile | null) =>
+    setNavigator((s) => ({ ...s, profile }));
   const controller = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -134,6 +150,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
     }
   }
   useEffect(() => {
+    if (!open) return;
     field.current?.focus();
     const q = sessionStorage.getItem("nv-question");
     if (q) {
@@ -145,16 +162,17 @@ export default function Chat({ onClose }: { onClose: () => void }) {
     };
     window.addEventListener("keydown", key);
     return () => {
-      controller.current?.abort();
       window.removeEventListener("keydown", key);
     };
-  }, []);
+  }, [open]);
+  useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
     end.current?.scrollIntoView({ block: "nearest" });
   }, [messages]);
   async function send() {
     const text = input.trim();
     if (!text || busy) return;
+    const turn = ++chatTurn.current;
     setInput("");
     setBusy(true);
     setError("");
@@ -178,7 +196,9 @@ export default function Chat({ onClose }: { onClose: () => void }) {
         conversation,
         c.signal,
         priorHistory,
+        conversationProfile,
       )) {
+        if (turn !== chatTurn.current) return;
         if (e.type === "tool_start")
           setTrace((t) => [
             ...t,
@@ -213,16 +233,18 @@ export default function Chat({ onClose }: { onClose: () => void }) {
         if (e.type === "done") setConversation(e.conversationId);
       }
     } catch (e) {
+      if (turn !== chatTurn.current) return;
       setMessages((m) => {
         const last = m.at(-1);
         return last?.role === "assistant" && !last.text ? m.slice(0, -1) : m;
       });
       if (!c.signal.aborted) setError((e as Error).message);
     } finally {
-      setBusy(false);
+      if (turn === chatTurn.current) setBusy(false);
     }
   }
   function resetChat() {
+    chatTurn.current++;
     controller.current?.abort();
     generation.current++;
     setMessages([]);
@@ -246,7 +268,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
     : ["province_code", "subjects", "rank"];
   const profileReady = profileMissing.length === 0;
   return (
-    <>
+    <div hidden={!open} data-navigator-panel>
       <div className="chat-scrim" onClick={onClose} />
       <section
         className="chat-drawer"
@@ -294,6 +316,9 @@ export default function Chat({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="chat-messages">
+          <p className="muted">
+            关闭后可继续咨询。最近的咨询记录保存在此浏览器，可用“清空对话”删除。
+          </p>
           <div className="chat-welcome">
             <span className="eyebrow">LET’S FIND YOUR DIRECTION</span>
             <h2>
@@ -575,6 +600,6 @@ export default function Chat({ onClose }: { onClose: () => void }) {
           <Evidence ids={evidence} />
         </Modal>
       )}
-    </>
+    </div>
   );
 }

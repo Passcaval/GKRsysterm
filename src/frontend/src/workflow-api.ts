@@ -1,3 +1,4 @@
+import type { AtlasContext } from "./navigator-state";
 import { loginInput } from "./auth";
 import { authenticateDemo } from "./demo-auth";
 import type {
@@ -29,6 +30,7 @@ import type {
   CatalogSummary,
   CatalogRun,
   AdmissionKnowledgeSummary,
+  AtlasSearchResult,
 } from "./types";
 import { hasPermission } from "./types";
 import { classify, validateProfile } from "./domain";
@@ -1502,6 +1504,40 @@ export function createWorkflowApi(ctx: Context) {
         localStorage.setItem(personalKey, JSON.stringify(saved));
       }
       return v;
+    },
+    async atlasSearch(context: AtlasContext): Promise<AtlasSearchResult> {
+      if (!isMock)
+        return request("/atlas/search", "POST", context, {
+          timeoutMs: 150000,
+          auth: false,
+        });
+      const contains = (value: string, terms: string[]) =>
+        !terms.length ||
+        terms.some((t) => value.includes(t.replace(/[省市]$/, "")));
+      const items = ctx
+        .db()
+        .schools.filter(
+          (s) =>
+            contains(s.city + s.province, context.cities) &&
+            contains(s.majors.join(" "), context.majors) &&
+            (!context.query ||
+              (s.name + s.city + s.majors.join(" ")).includes(context.query)) &&
+            (!context.subjects.length ||
+              s.requiredSubjects.every((v) => context.subjects.includes(v))) &&
+            s.rank !== null &&
+            Math.abs(s.rank - context.rank) <= context.rank * 0.5,
+        )
+        .sort(
+          (a, b) =>
+            Math.abs(a.rank! - context.rank) - Math.abs(b.rank! - context.rank),
+        )
+        .slice(0, 30);
+      return {
+        items,
+        basis: context,
+        rankedCount: items.length,
+        note: "示例历史位次，仅用于演示。",
+      };
     },
     async schools(
       query = "",

@@ -1,9 +1,7 @@
-"""Deterministic profile-change proposals derived from chat messages.
+"""Extract explicit conversational facts and preferences without guessing.
 
-A chat message is never allowed to silently rewrite a profile. We extract only
-explicit, unambiguous facts here; the UI must ask the user to confirm before
-``signals_router`` applies them. The upstream retrieved source IDs are stored
-with the signal so the search context remains auditable feedback.
+The chat applies these values to its scoped context; formal recommendation
+consent and reviewed admissions data remain separate.
 """
 
 from __future__ import annotations
@@ -111,7 +109,7 @@ def extract_profile_values(message: str) -> dict:
     ranks = {
         int(value.replace(",", ""))
         for value in re.findall(
-            r"(?:位次|排名|名次)\s*(?:是|为|[:：])?\s*(\d[\d,]{0,8})(?![\d,万千])",
+            r"(?:位次|排名|名次)\s*(?:改为|改成|调整为|更正为|更新为|是|为|[:：])?\s*(\d[\d,]{0,8})(?![\d,万千])",
             message,
         )
         if value.replace(",", "").isdigit() and 1 <= int(value.replace(",", "")) <= 5000000
@@ -171,14 +169,31 @@ def extract_profile_values(message: str) -> dict:
             match = re.search(r"(?<!不)(?:想去|希望去|想在)\s*([^。；;，,\n]+)", clause)
             if match and not re.search(r"大学|学院", match[1]):
                 destinations.extend(p for p in PROVINCES if p in match[1])
+        # A destination city is not an exam province.
+        city_match = re.search(
+            r"(?<!不)(?:想在|希望在|想去|希望去)\s*([一-鿿]{2,10}?)(?:读|学|上|念)",
+            message,
+        )
+        if city_match:
+            place = city_match[1].removesuffix("市").removesuffix("省")
+            destinations = [place]
         if destinations:
             values["cities"] = list(dict.fromkeys(destinations))
     if "interests" not in values:
         match = re.search(
             r"(?<!不)(?:想学|想读|希望学)\s*([一-鿿A-Za-z]{2,30}?)(?:专业|[，,。；;]|$)", message
         )
+        if not match:
+            match = re.search(
+                r"(?<!不)(?:想在|希望在|想去|希望去)\s*[一-鿿]{2,10}?(?:读|学|上|念)\s*([一-鿿A-Za-z]{2,30}?)(?:专业|[，,。；;]|$)",
+                message,
+            )
         if match:
             values["interests"] = [match[1]]
+    if re.search(r"不限城市|城市不限|地域不限", message):
+        values["cities"] = []
+    if re.search(r"不限专业|专业不限", message):
+        values["interests"] = []
     return values
 
 

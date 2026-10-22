@@ -169,6 +169,7 @@ export function bootstrapFromWire(raw: any): Bootstrap {
   };
 }
 export interface RequestOptions {
+  timeoutMs?: number;
   key?: string;
   headers?: Record<string, string>;
   signal?: AbortSignal;
@@ -187,7 +188,7 @@ export async function request<T>(
   const abort = () => controller.abort();
   options.signal?.addEventListener("abort", abort, { once: true });
   if (options.signal?.aborted) controller.abort();
-  const timer = setTimeout(abort, 20000);
+  const timer = setTimeout(abort, options.timeoutMs || 20000);
   try {
     const form = body instanceof FormData;
     const operation = operationFor(contract, path, method);

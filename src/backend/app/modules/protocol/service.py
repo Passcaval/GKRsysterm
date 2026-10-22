@@ -285,7 +285,7 @@ def source_view(db, source_id):
     return {
         "id": str(item.id),
         **wire(
-            {key: value for key, value in item.data.items() if key not in {"body", "query_hash"}}
+            {key: value for key, value in item.data.items() if key not in {"body", "query_hash", "rows", "facts", "query_key"}}
         ),
         "content_hash": item.content_hash,
         "version": item.content_hash,

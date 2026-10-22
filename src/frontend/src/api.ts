@@ -291,6 +291,7 @@ export const api = {
     conversationId: string | undefined,
     signal: AbortSignal,
     history?: { role: "user" | "assistant"; content: string }[],
+    profileContext?: Profile | null,
   ): AsyncGenerator<ChatEvent> {
     if (isMock) {
       yield {
@@ -339,7 +340,7 @@ export const api = {
       };
       return;
     }
-    yield* streamChat(message, conversationId, signal, history);
+    yield* streamChat(message, conversationId, signal, history, profileContext);
   },
   ...createWorkflowApi({ db, save, requireUser }),
 };

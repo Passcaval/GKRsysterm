@@ -237,3 +237,38 @@
     max-width: calc(100% - 420px);
   }
 }
+
+.atlas-filters .atlas-filter-row > label {
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  color: #bcb49e;
+}
+.atlas-filters .atlas-filter-row input {
+  width: 100%;
+  min-width: 0;
+  margin-top: 6px;
+}
+.star-map .voyager-position {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.star-map .voyager-position::before,
+.star-map .voyager-position::after {
+  content: none;
+}
+@media (max-width: 460px) {
+  .atlas-filters .atlas-filter-row {
+    flex-wrap: wrap;
+  }
+  .atlas-filters .atlas-filter-row > label {
+    flex-basis: 100%;
+  }
+}
+
+.atlas-filters {
+  max-height: calc(100dvh - 160px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
