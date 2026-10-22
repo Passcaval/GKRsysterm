@@ -22,6 +22,8 @@
 
 `latest_job` 可为空，否则含 `id, status, error, created_at`。Job 状态为 queued/running/succeeded/failed；错误只包含代码。前端访问层转换为 camelCase，管理页显示快照数量、缓存时长、任务状态和刷新按钮；演示模式不访问搜索服务。
 
+联网证据的 `origin=deepseek_search`；`year` 表示查询年份范围，不能视作网页实际适用年份或发布时间。前端明确显示“查询范围／原文年份请核对”；`published_at` 未知时为空，正文中的真实年份仍须逐项核对。
+
 `POST /api/v1/chat/stream` 沿用原有 SSE：新增工具名 `web_search`，继续使用 `tool_start/tool_end/evidence/delta/done`。证据 ID 可通过既有 `GET /api/v1/evidence/{id}` 查询，状态仍为 `unverified`，不对外返回内部检索指纹或完整缓存正文。答复中的数值须能在引用正文中找到，并区分生源省份、年份、批次；不能将历年分数说成当年数据或录取概率。
 
 ## 数据边界

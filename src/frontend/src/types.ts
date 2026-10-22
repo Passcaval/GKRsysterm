@@ -85,6 +85,7 @@ export interface Profile {
 }
 export interface Source {
   id: string;
+  origin?: string;
   kind: "official" | "experience" | "inference";
   title: string;
   url: string | null;
