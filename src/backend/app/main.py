@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from uuid import uuid4
 
@@ -23,6 +24,8 @@ from app.modules.history.router import router as history
 from app.modules.profiles.router import router as profiles
 from app.modules.profiles.suggestions import router as profile_suggestions
 from app.modules.recommendation.router import router as recommendations
+
+logger = logging.getLogger("app.http")
 
 
 class BodyLimit:
@@ -115,6 +118,13 @@ def create_app(settings: Settings | None = None, *, contract_version="0.4"):
 
     @app.exception_handler(HTTPException)
     async def http_error(request, exc):
+        logger.warning(
+            "HTTP %s on %s %s: %s",
+            exc.status_code,
+            request.method,
+            request.url.path,
+            exc.detail,
+        )
         return error_response(
             request, exc.status_code, "HTTP_ERROR", "请求无法处理，请检查路径与输入。"
         )

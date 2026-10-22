@@ -14,7 +14,7 @@ python deploy/manage.py init
 python3 deploy/manage.py init
 ```
 
-`init` creates `deploy/.env`, prompts for the compatible model and builds images. PostgreSQL becomes healthy first, then the one-off `migrate` service completes Alembic migrations; API and both workers wait for migration success. It then prompts for the first administrator if needed. Model variables also update an existing local `src/backend/.env`. Pressing Enter keeps existing values; leaving a previously empty key blank disables model features.
+`init` creates `deploy/.env`, prompts for the compatible model and builds images. PostgreSQL becomes healthy first, then the one-off `migrate` service completes Alembic migrations; API and both workers wait for migration success. It then clears existing candidate profiles and chat contexts with `app.cli clear-chat-profiles` before prompting for the first administrator if needed. Model variables also update an existing local `src/backend/.env`. Pressing Enter keeps existing values; leaving a previously empty key blank disables model features.
 
 ## National school directory (automatic)
 
@@ -47,7 +47,7 @@ MODEL_API_KEY=...
 MODEL_NAME=deepseek-flash
 ```
 
-`MODEL_BASE_URL` must include the provider's API prefix; the gateway appends `/chat/completions`. The copilot streams answers over SSE, retrieves only published admission units, and shows source evidence. It does not present itself as a formal recommendation; use the profile + recommendation workflow for validated results.
+`MODEL_BASE_URL` must include the provider's API prefix; the gateway appends `/chat/completions`. The copilot streams answers over SSE, retrieves only published admission units, and shows source evidence. It does not present itself as a formal recommendation; use the recommendation workflow for validated results. Navigator queries are available without login; anonymous requests use client-provided recent history and are not persisted. Community posting and all admin/review actions still require login or an administrator session.
 
 ## Admission auto-crawl (optional)
 
@@ -72,4 +72,4 @@ python deploy/manage.py backup
 
 `down` removes containers and the Compose network but preserves named volumes. Never add `--volumes`/`-v` unless you intend to permanently erase the database and uploads. `backup` exports PostgreSQL and private uploads into the ignored `backups/` directory; copy those files to protected off-machine storage. A restore must restore both artifacts together and should first be rehearsed against a separate deployment. The project has not yet had a production restore drill.
 
-For a new application image, run `python deploy/manage.py up`. It builds images, waits for PostgreSQL, applies migrations in a one-off API container, and then starts application services and workers. This order lets the first automatic crawl see the required tables. Review application release notes and take a backup before upgrading a deployment with important data.
+For a new application image, run `python deploy/manage.py up`. It builds images, waits for PostgreSQL, applies migrations in a one-off API container, clears existing candidate profiles and chat contexts, and then starts application services and workers. This order lets the first automatic crawl see the required tables. `start` only starts existing containers and does not clear profiles. Review application release notes and take a backup before upgrading a deployment with important data.

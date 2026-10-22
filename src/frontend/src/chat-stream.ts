@@ -7,6 +7,7 @@ export async function* streamChat(
   message: string,
   conversationId: string | undefined,
   signal: AbortSignal,
+  history?: { role: "user" | "assistant"; content: string }[],
 ): AsyncGenerator<ChatEvent> {
   const controller = new AbortController();
   const stop = () => controller.abort();
@@ -24,7 +25,11 @@ export async function* streamChat(
         Accept: "text/event-stream",
         "X-Requested-With": "NightVoyage",
       },
-      body: JSON.stringify({ message, conversation_id: conversationId }),
+      body: JSON.stringify({
+        message,
+        conversation_id: conversationId,
+        ...(history?.length ? { history } : {}),
+      }),
     });
     if (!response.ok || !response.body) {
       const value = await response.json().catch(() => null);

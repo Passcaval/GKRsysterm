@@ -3,7 +3,7 @@ import getpass
 import os
 from datetime import timedelta
 
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -11,10 +11,16 @@ from app.core.security import hasher, validate_email, validate_nickname
 from app.core.storage import blob_path
 from app.db.models import (
     Application,
+    ChatProfileSignal,
+    Conversation,
+    ConversationMessage,
     CrawlPage,
     CrawlRun,
+    Feedback,
     IdentityClaim,
+    ProfileVersion,
     RateBucket,
+    RecommendationRun,
     RegistrationEvidence,
     SessionToken,
     User,
@@ -90,6 +96,23 @@ def cleanup(db, settings):
     return len(records)
 
 
+def clear_chat_profiles(db):
+    """Reset chat-derived profiles before a deployment or redeploy.
+
+    Historical recommendation runs keep their JSON snapshots, but detach from
+    the deleted profile versions so foreign keys remain valid.
+    """
+    db.execute(update(RecommendationRun).values(profile_version_id=None))
+    db.execute(update(Feedback).values(profile_version_id=None))
+    db.execute(delete(ChatProfileSignal))
+    db.execute(delete(ConversationMessage))
+    db.execute(delete(Conversation))
+    count = db.scalar(select(func.count()).select_from(ProfileVersion)) or 0
+    db.execute(delete(ProfileVersion))
+    db.commit()
+    return count
+
+
 def main():
     parser = argparse.ArgumentParser()
     commands = parser.add_subparsers(dest="command", required=True)
@@ -98,6 +121,10 @@ def main():
     admin.add_argument("--email", required=True)
     commands.add_parser("cleanup")
     commands.add_parser("crawl")
+    commands.add_parser(
+        "clear-chat-profiles",
+        help="Clear chat conversations, signals and candidate profiles before redeploy",
+    )
     args = parser.parse_args()
     settings = Settings()
     engine = create_engine(settings.database_url, hide_parameters=True)
@@ -126,6 +153,8 @@ def main():
                 db.commit()
                 print("Created crawl run:", run.id)
                 print("The worker will process it; review it via /admin/admissions/crawl.")
+            elif args.command == "clear-chat-profiles":
+                print("Removed candidate profiles:", clear_chat_profiles(db))
             else:
                 print("Removed expired terminal-application evidence:", cleanup(db, settings))
     finally:
