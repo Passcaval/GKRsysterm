@@ -164,3 +164,13 @@ def test_natural_city_major_updates_do_not_change_exam_province():
     assert values["interests"] == ["临床医学"] and "province" not in values
     assert extract_profile_values("城市不限，专业不限")["cities"] == []
     assert "cities" not in extract_profile_values("不想在杭州读计算机")
+
+
+def test_plain_destination_and_home_suggestion_region_are_usable():
+    from app.modules.agent.profile_signals import extract_profile_values
+
+    assert extract_profile_values("想去杭州")["cities"] == ["杭州"]
+    assert extract_profile_values("628分，想在江浙沪读计算机")["cities"] == ["江苏", "浙江", "上海"]
+    assert extract_profile_values("想去江苏和浙江读计算机")["cities"] == ["江苏", "浙江"]
+    assert atlas.region_matches({"province": "浙江省", "city": "杭州市"}, ["江浙沪"])
+    assert not atlas.region_matches({"province": "陕西省", "city": "西安市"}, ["江浙沪"])

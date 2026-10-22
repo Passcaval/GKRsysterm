@@ -17,6 +17,7 @@ from app.db.models import Source, now
 from app.db.session import get_db
 from app.modules.admissions.atlas_reference import table_facts
 from app.modules.admissions.knowledge import retrieve_knowledge
+from app.modules.agent.profile_signals import REGION_GROUPS
 from app.modules.community.schemas import StrictModel
 
 router = APIRouter(prefix="/api/v1/atlas", tags=["public atlas exploration"])
@@ -43,6 +44,7 @@ def compact(value):
 
 
 def region_matches(school, regions):
+    regions = [place for value in regions for place in REGION_GROUPS.get(value, [value])]
     return not regions or any(
         re.sub(r"[省市]$", "", v) in school.get("city", "") + school.get("province", "")
         for v in regions

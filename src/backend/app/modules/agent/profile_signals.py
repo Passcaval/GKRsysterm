@@ -44,6 +44,7 @@ PROVINCES = (
     "澳门",
     "台湾",
 )
+REGION_GROUPS = {"江浙沪": ["江苏", "浙江", "上海"]}
 SUBJECTS = ("物理", "化学", "生物", "历史", "地理", "政治", "技术")
 FIELD_LABELS = {
     "province": "生源省份",
@@ -171,12 +172,12 @@ def extract_profile_values(message: str) -> dict:
                 destinations.extend(p for p in PROVINCES if p in match[1])
         # A destination city is not an exam province.
         city_match = re.search(
-            r"(?<!不)(?:想在|希望在|想去|希望去)\s*([一-鿿]{2,10}?)(?:读|学|上|念)",
+            r"(?<!不)(?:想在|希望在|想去|希望去)\s*([一-鿿]{2,10}?)(?:读|学|上|念|[，,。；;]|$)",
             message,
         )
-        if city_match:
+        if city_match and not destinations:
             place = city_match[1].removesuffix("市").removesuffix("省")
-            destinations = [place]
+            destinations = REGION_GROUPS.get(place, [place])
         if destinations:
             values["cities"] = list(dict.fromkeys(destinations))
     if "interests" not in values:
