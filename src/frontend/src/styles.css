@@ -2564,11 +2564,32 @@ kbd {
 .chat-header > button {
   margin-left: auto;
 }
+.chat-header > .chat-reset {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.chat-header > .chat-reset + .icon-button {
+  margin-left: 0;
+}
 .chat-messages {
   padding: 30px 26px;
   overflow-y: auto;
   flex: 1;
   overscroll-behavior: contain;
+}
+.navigator-chat-guide {
+  border-top: 1px solid var(--line);
+  padding: 18px 0;
+  margin-top: 18px;
+}
+.navigator-chat-guide p {
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 6px 0;
+}
+.navigator-chat-guide .button {
+  width: 100%;
+  margin-top: 8px;
 }
 .navigator-profile,
 .navigator-results {

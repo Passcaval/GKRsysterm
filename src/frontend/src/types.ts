@@ -234,6 +234,9 @@ export interface ChatEvent {
   sourceIds?: string[];
   conversationId?: string;
   signalId?: string;
+  applied?: boolean;
+  profile?: Profile;
+  conversationProfile?: Profile;
   changes?: ProfileUpdateChange[];
   expectedVersion?: number;
   question?: string;

@@ -13,11 +13,11 @@ from pydantic import Field
 from app.core.errors import DomainError, missing
 from app.core.model import ModelCallFailed, ModelGateway, ModelNotConfigured
 from app.core.security import current_user, throttle
-from app.db.models import ChatProfileSignal, Conversation
+from app.db.models import ChatProfileSignal, Conversation, now
 from app.db.session import get_db
 from app.modules.agent.profile_signals import (
     extract_profile_changes,
-    signal_question,
+    signal_applied_question,
 )
 from app.modules.agent.service import (
     add_message,
@@ -25,16 +25,35 @@ from app.modules.agent.service import (
     build_messages,
     build_school_context,
     history_for,
+    missing_chat_fields,
     retrieve_schools,
     retrieve_units,
     search_terms,
     target_values,
 )
 from app.modules.community.schemas import StrictModel
-from app.modules.profiles.service import current_profile
+from app.modules.profiles.service import (
+    apply_chat_changes,
+    conversation_profile,
+    current_profile,
+    merge_chat_values,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["M1 chat"])
 logger = logging.getLogger("agent.chat")
+
+
+def _profile_state(record) -> dict:
+    data = dict(record.data)
+    data.update(
+        {
+            "version": record.version,
+            "profileVersionId": str(record.id),
+            "preferredSchools": data.get("schools", []),
+            "rankCohort": data.get("rank_cohort"),
+        }
+    )
+    return data
 
 
 class ChatInput(StrictModel):
@@ -73,31 +92,57 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
         db.refresh(conversation)
 
     profile_record = current_profile(db, user.id)
-    profile = profile_record.data if profile_record else None
-    terms = search_terms(data.message, profile)
-    target_score, target_rank = target_values(profile, data.message)
+    prior_conversation = conversation_profile(db, conversation.id)
+    history = history_for(db, conversation.id)
+    user_message = add_message(db, conversation.id, user.id, "user", data.message)
+    db.flush()
+    changes = extract_profile_changes(prior_conversation, data.message)
+    if changes:
+        global_changes = [
+            change
+            for change in changes
+            if (profile_record.data if profile_record else {}).get(change.get("field"))
+            != change.get("new")
+        ]
+        try:
+            if global_changes:
+                profile_record = apply_chat_changes(db, user.id, global_changes)
+        except Exception:
+            logger.exception("could not apply chat profile changes")
+            changes = []
+    conversation_values = (
+        merge_chat_values(prior_conversation, changes) if changes else prior_conversation
+    )
+
+    terms = search_terms(data.message, conversation_values)
+    target_score, target_rank = target_values(conversation_values, data.message)
     rows = retrieve_units(
         db,
         terms,
         target_score=target_score,
         target_rank=target_rank,
-        profile=profile,
+        profile=conversation_values,
     )
-    school_rows = retrieve_schools(db, terms, profile, data.message) if not rows else []
+    school_rows = retrieve_schools(db, terms, conversation_values, data.message) if not rows else []
     context, source_ids = build_context(rows)
     school_context, school_source_ids = build_school_context(school_rows)
     source_ids = list(dict.fromkeys([*source_ids, *school_source_ids]))
-    history = history_for(db, conversation.id)
+    missing_fields = missing_chat_fields(conversation_values)
+    missing_text = "、".join(missing_fields)
+    fallback_text = (
+        f"要给出可比较的院校和专业，我还需要：{missing_text}。你可以直接在这里告诉我。"
+        if missing_fields
+        else "我暂时没有生成有效回答，请稍后再试。"
+    )
     messages = build_messages(
-        profile,
+        conversation_values,
         context,
         history,
         data.message,
         school_context=school_context,
+        missing_fields=missing_fields,
     )
-    user_message = add_message(db, conversation.id, user.id, "user", data.message)
-    db.flush()
-    changes = extract_profile_changes(profile, data.message) if profile_record else []
+
     signal = None
     if changes:
         signal = ChatProfileSignal(
@@ -107,8 +152,11 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
             changes=changes,
             source_ids=source_ids,
             query_text=data.message[:500],
+            status="confirmed",
+            resolved_at=now(),
         )
         db.add(signal)
+        db.flush()
     db.commit()
 
     conversation_id = conversation.id
@@ -118,7 +166,15 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
     sessions = request.app.state.sessions
     signal_id = signal.id if signal else None
     expected_version = profile_record.version if profile_record else None
-    question = signal_question(changes) if changes else ""
+    question = signal_applied_question(changes) if changes else ""
+    profile_payload = _profile_state(profile_record) if profile_record else None
+    conversation_payload = {
+        **conversation_values,
+        "version": profile_record.version if profile_record else 0,
+        "profileVersionId": str(profile_record.id) if profile_record else "",
+        "preferredSchools": conversation_values.get("schools", []),
+        "rankCohort": conversation_values.get("rank_cohort"),
+    }
 
     def stream():
         chunks: list[str] = []
@@ -165,6 +221,9 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
                     {
                         "type": "profile_update",
                         "signal_id": str(signal_id),
+                        "applied": True,
+                        "profile": profile_payload,
+                        "conversation_profile": conversation_payload,
                         "changes": changes,
                         "expected_version": expected_version,
                         "question": question,
@@ -175,7 +234,7 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
             try:
                 for delta in gateway.stream_text(
                     messages,
-                    max_tokens=settings.model_max_output_tokens,
+                    max_tokens=max(settings.model_max_output_tokens, 8000),
                     temperature=0.3,
                 ):
                     if delta:
@@ -197,8 +256,8 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
 
             text = "".join(chunks).strip()
             if not text:
-                yield _event({"type": "error", "text": "模型没有返回内容，请重试。"})
-                return
+                text = fallback_text
+                yield _event({"type": "delta", "text": text})
             with sessions.begin() as save_db:
                 add_message(
                     save_db,

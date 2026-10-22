@@ -17,12 +17,26 @@ test("SSE handles byte/chunk boundaries, CRLF, comments, and multiple events", (
   );
   p.finish();
 });
-test("SSE profile_update carries an explicit confirmation payload", () => {
+test("SSE profile_update carries the auto-applied profile", () => {
   const payload = {
     type: "profile_update",
     signal_id: "signal-1",
+    applied: true,
+    profile: {
+      province: "浙江",
+      year: 2026,
+      version: 3,
+      profileVersionId: "profile-1",
+    },
+    conversation_profile: {
+      province: "浙江",
+      year: 2026,
+      score: 628,
+      rank: 33226,
+      subjects: [],
+    },
     expected_version: 2,
-    question: "要更新考生画像吗？",
+    question: "已根据这次对话记下：生源省份 → 浙江",
     source_ids: ["source-1"],
     changes: [
       { field: "province", label: "生源省份", old: "河南", new: "浙江" },
@@ -34,8 +48,22 @@ test("SSE profile_update carries an explicit confirmation payload", () => {
       {
         type: "profile_update",
         signalId: "signal-1",
+        applied: true,
+        profile: {
+          province: "浙江",
+          year: 2026,
+          version: 3,
+          profileVersionId: "profile-1",
+        },
+        conversationProfile: {
+          province: "浙江",
+          year: 2026,
+          score: 628,
+          rank: 33226,
+          subjects: [],
+        },
         expectedVersion: 2,
-        question: "要更新考生画像吗？",
+        question: "已根据这次对话记下：生源省份 → 浙江",
         sourceIds: ["source-1"],
         changes: [
           { field: "province", label: "生源省份", old: "河南", new: "浙江" },

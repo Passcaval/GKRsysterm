@@ -237,10 +237,10 @@ function Item({
         <summary>反馈这条推荐</summary>
         {sent ? (
           <p role="status">
-            反馈已记录并关联任务、推荐项和当时画像版本。
+            反馈已记录并关联任务、推荐项和当时的信息版本。
             {kind === "correction"
               ? "事实纠错等待核验，不会立即改写官方资料。"
-              : "偏好变化需确认后再更新画像。"}
+              : "偏好变化可以继续在领航员对话里补充。"}
           </p>
         ) : (
           <form onSubmit={feedback}>
@@ -428,58 +428,20 @@ export default function RunRoutes() {
       <PageTitle
         eyebrow="A ROUTE YOU CAN TRACE"
         title="每一条航线，都有依据"
-        description="先确认问题和画像，再创建推荐任务。仅展示通过结果校验的建议，未知条件会单列。"
+        description="推荐由领航员对话生成。这里查看可追溯的任务、条件核对和结果依据。"
       />
-      <form
-        className="panel run-create"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void create();
-        }}
-      >
-        <label>
-          这次想了解什么？
-          <textarea
-            required
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-          />
-        </label>
-        <div className="form-grid">
-          <label>
-            查询意图
-            <select
-              value={intent}
-              onChange={(e) => setIntent(e.target.value as typeof intent)}
-            >
-              <option value="campus_life">校园生活（不要求成绩）</option>
-              <option value="admission">个性化报考条件</option>
-              <option value="risk">报考与历史风险分析</option>
-            </select>
-          </label>
-          <label>
-            选择偏好 {risk}
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={risk}
-              onChange={(e) => setRisk(Number(e.target.value))}
-            />
-          </label>
-        </div>
+      <section className="panel">
+        <h2>从一句话开始</h2>
         <p className="muted">
-          画像版本：{data.profile?.profileVersionId || "暂无，将按本次问题补问"}
-          。调整滑块不会自动创建后台任务。
+          不用填表。回到领航员说出你的情况，它会自动整理信息并生成可追溯推荐。
         </p>
-        <button className="button gold-button" disabled={busy || !!ongoing}>
-          {busy
-            ? "处理中…"
-            : ongoing
-              ? "请先完成或取消当前任务"
-              : "确认并生成航线"}
+        <button
+          className="button gold-button"
+          onClick={() => window.dispatchEvent(new Event("nv-open-chat"))}
+        >
+          回到领航员
         </button>
-      </form>
+      </section>
       {error && (
         <div className="notice amber" role="alert">
           <p>{error}</p>
@@ -493,8 +455,8 @@ export default function RunRoutes() {
           </div>
           <p>任务编号：{run.runId}</p>
           <p className="muted">
-            {beijingTime(run.createdAt)} · 绑定画像{" "}
-            {run.profileVersionId || "无"} · 原始画像{" "}
+            {beijingTime(run.createdAt)} · 绑定信息{" "}
+            {run.profileVersionId || "无"} · 原始信息{" "}
             {run.originalProfileVersionId || "无"}
           </p>
           <p className="muted">
@@ -536,46 +498,21 @@ export default function RunRoutes() {
         </section>
       )}
       {run?.status === "waiting_input" && (
-        <form className="panel" onSubmit={answer}>
-          <h2>补充本次需要的条件</h2>
+        <section className="panel">
+          <h2>还需要一点信息</h2>
           <p className="muted">
-            提交后会形成新的画像版本，最初版本仍保留在任务中。
+            {run.questions.map((q) => q.text).join("；")}
           </p>
-          {run.questions.map((q) => (
-            <label key={q.field}>
-              {q.text}
-              {q.field === "consent" ? (
-                <select
-                  required
-                  value={answers[q.field] || ""}
-                  onChange={(e) =>
-                    setAnswers((p) => ({ ...p, [q.field]: e.target.value }))
-                  }
-                >
-                  <option value="">请选择</option>
-                  <option value="true">同意本次使用画像</option>
-                  <option value="false">不同意</option>
-                </select>
-              ) : (
-                <input
-                  required={q.required}
-                  type={
-                    ["rank", "score", "exam_year"].includes(q.field)
-                      ? "number"
-                      : "text"
-                  }
-                  value={answers[q.field] || ""}
-                  onChange={(e) =>
-                    setAnswers((p) => ({ ...p, [q.field]: e.target.value }))
-                  }
-                />
-              )}
-            </label>
-          ))}
-          <button className="button gold-button" disabled={busy}>
-            确认答案并继续任务
+          <p className="muted">
+            不用在这里填表。回到领航员继续说，它会自动记下需要的信息。
+          </p>
+          <button
+            className="button gold-button"
+            onClick={() => window.dispatchEvent(new Event("nv-open-chat"))}
+          >
+            回到领航员继续聊
           </button>
-        </form>
+        </section>
       )}
       {run?.validation.status === "passed" &&
         ["succeeded", "partial"].includes(run.status) && (
@@ -594,9 +531,11 @@ export default function RunRoutes() {
                 <button
                   type="button"
                   className="text-button"
-                  onClick={() => navigate("/me")}
+                  onClick={() =>
+                    window.dispatchEvent(new Event("nv-open-chat"))
+                  }
                 >
-                  去补充考生画像
+                  回到领航员补充
                 </button>
               </section>
             )}

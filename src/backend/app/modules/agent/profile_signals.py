@@ -83,7 +83,7 @@ def extract_profile_values(message: str) -> dict:
         for province in PROVINCES
         if re.search(
             rf"(?:生源(?:省份)?|高考省份|省份|我(?:现在)?在|我来自|我是)\s*[:：是为]?\s*{province}"
-            rf"|{province}(?:省)?(?:考生|高考)",
+            rf"|{province}(?:省)?(?:内)?(?:考生|高考|排名|位次|(?=\s*\d{{3,}}))",
             message,
         )
     }
@@ -99,19 +99,36 @@ def extract_profile_values(message: str) -> dict:
         for value in re.findall(r"(?<!\d)([1-9]\d{2})\s*分", message)
         if 100 <= int(value) <= 900
     }
+    if not scores:
+        scores = {
+            int(value)
+            for value in re.findall(r"(?<!\d)([1-9]\d{2})(?!\d)", message)
+            if 100 <= int(value) <= 900
+        }
     if len(scores) == 1:
         values["score"] = next(iter(scores))
 
     ranks = {
         int(value.replace(",", ""))
-        for value in re.findall(r"位次\s*(?:是|为|[:：])?\s*(\d[\d,]{0,8})(?![\d,万千])", message)
+        for value in re.findall(
+            r"(?:位次|排名|名次)\s*(?:是|为|[:：])?\s*(\d[\d,]{0,8})(?![\d,万千])",
+            message,
+        )
         if value.replace(",", "").isdigit() and 1 <= int(value.replace(",", "")) <= 5000000
     }
+    if not ranks and "province" in values:
+        ranks = {
+            int(value.replace(",", ""))
+            for value in re.findall(r"(?<!\d)([1-9]\d{3,7})(?!\d)", message)
+            if value.replace(",", "").isdigit()
+            and not 2024 <= int(value.replace(",", "")) <= 2035
+            and 1 <= int(value.replace(",", "")) <= 5000000
+        }
     if len(ranks) == 1:
         values["rank"] = next(iter(ranks))
 
-    if re.search(r"选科|选考|选的是", message) and not re.search(
-        r"(?:选科|选考)(?:不是|不选|不包含)", message
+    if re.search(r"选科|选考|选的是|选了|选择", message) and not re.search(
+        r"(?:选科|选考|选了|选择)(?:不是|不选|不包含)", message
     ):
         subjects = [subject for subject in SUBJECTS if subject in message]
         if len(subjects) == 3:
@@ -127,7 +144,7 @@ def extract_profile_values(message: str) -> dict:
                 "技": "技术",
             }
             match = re.search(
-                r"(?:选科|选考|选的是)\s*[:：是为]?\s*([物化生史地政技]{3})(?![物化生史地政技])",
+                r"(?:选科|选考|选的是|选了|选择)\s*[:：是为]?\s*([物化生史地政技]{3})(?![物化生史地政技])",
                 message,
             )
             if match and len(set(match[1])) == 3:
@@ -165,9 +182,8 @@ def extract_profile_values(message: str) -> dict:
     return values
 
 
-def extract_profile_changes(profile: dict, message: str) -> list[dict]:
-    if not profile:
-        return []
+def extract_profile_changes(profile: dict | None, message: str) -> list[dict]:
+    profile = profile or {}
     changes = []
     for field, value in extract_profile_values(message).items():
         if field == "subjects" and set(value) == set(profile.get(field) or []):
@@ -187,6 +203,13 @@ def signal_question(changes: list[dict]) -> str:
         new = change.get("new")
         parts.append(f"{change['label']} {old} → {new}")
     return "我注意到你这次提到：" + "；".join(parts) + "。要现在更新考生画像吗？"
+
+
+def signal_applied_question(changes: list[dict]) -> str:
+    parts = []
+    for change in changes:
+        parts.append(f"{change['label']} → {change.get('new')}")
+    return "已根据这次对话记下：" + "；".join(parts)
 
 
 def signal_view(signal) -> dict:

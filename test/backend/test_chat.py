@@ -26,6 +26,19 @@ class FakeGateway:
         self.closed = True
 
 
+class EmptyGateway:
+    def __init__(self):
+        self.messages = []
+
+    def stream_text(self, messages, *, max_tokens=None, temperature=0.3):
+        self.messages = messages
+        if False:
+            yield ""
+
+    def close(self):
+        pass
+
+
 class Factory:
     def __init__(self, chunks=None):
         self.chunks = chunks
@@ -157,6 +170,70 @@ def test_chat_falls_back_to_national_directory_when_no_admission_units(app, mode
     assert "合成目录大学" in system
     assert "<school_directory>" in system
     assert "不含专业和投档数据" in system
+
+
+def test_chat_compact_query_uses_province_directory_and_asks_subjects(app, modern_chat):
+    client, factory = modern_chat
+    with app.state.sessions() as db:
+        db.add(
+            School(
+                code="4133010001",
+                data={
+                    "name": "合成浙江大学",
+                    "province": "浙江省",
+                    "city": "杭州市",
+                    "source_ids": ["zhejiang-catalog-source"],
+                    "catalog_basic": {
+                        "name": "合成浙江大学",
+                        "identifier": "4133010001",
+                        "province": "浙江省",
+                        "city": "杭州市",
+                        "education_level": "本科",
+                        "department": "浙江省",
+                        "category": "ordinary",
+                        "remarks": "",
+                    },
+                },
+            )
+        )
+        db.commit()
+
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"message": "620 浙江省内排名33226 有什么院校推荐"},
+    )
+    assert response.status_code == 200, response.text
+    payloads = events(response)
+    update = next(item for item in payloads if item["type"] == "profile_update")
+    conversation = update["conversation_profile"]
+    assert conversation["province"] == "浙江"
+    assert conversation["score"] == 620
+    assert conversation["rank"] == 33226
+    assert conversation["subjects"] == []
+    system = factory.gateways[0].messages[0]["content"]
+    assert "合成浙江大学" in system
+    assert "<missing_profile_fields>" in system
+    assert "三门选考科目" in system
+
+
+def test_chat_returns_required_field_prompt_when_model_output_is_empty(app, modern_chat):
+    client, _ = modern_chat
+    gateway = EmptyGateway()
+    client.app.state.model_gateway_factory = lambda settings: gateway
+    response = client.post(
+        "/api/v1/chat/stream",
+        json={"message": "有什么院校推荐"},
+    )
+    assert response.status_code == 200, response.text
+    payloads = events(response)
+    text = "".join(item["text"] for item in payloads if item["type"] == "delta")
+    assert "生源省份" in text
+    assert "省内位次" in text
+    assert "三门选考科目" in text
+    assert payloads[-1]["type"] == "done"
+    system = gateway.messages[0]["content"]
+    assert "<missing_profile_fields>" in system
+    assert "不能返回空内容" in system
 
 
 def test_chat_without_model_is_a_clear_503(student):

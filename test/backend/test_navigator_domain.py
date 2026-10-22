@@ -103,6 +103,20 @@ def test_preferences_change_order_without_promoting_subject_failures_or_mutating
     assert snapshot == old
 
 
+def test_profile_parser_accepts_compact_score_rank_and_selected_subjects():
+    assert extract_profile_values("620 浙江省63226 有什么院校推荐") == {
+        "province": "浙江",
+        "score": 620,
+        "rank": 63226,
+    }
+    assert extract_profile_values("620 浙江省内排名33226") == {
+        "province": "浙江",
+        "score": 620,
+        "rank": 33226,
+    }
+    assert extract_profile_values("选了物化生") == {"subjects": ["物理", "化学", "生物"]}
+
+
 def test_wire_dto_round_trips_optional_schools_and_null_score():
     value = internal_profile(
         {

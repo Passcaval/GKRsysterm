@@ -323,7 +323,7 @@ class ConversationMessage(Entity, Base):
 
 
 class ChatProfileSignal(Entity, Base):
-    """A chat-derived profile change awaiting explicit confirmation."""
+    """An audit record of profile facts extracted and applied from a chat turn."""
 
     __tablename__ = "chat_profile_signals"
     owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)

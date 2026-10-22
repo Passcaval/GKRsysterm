@@ -222,7 +222,7 @@ def target_values(profile: dict | None, message: str) -> tuple[int | None, int |
         if match and 100 <= int(match.group(1)) <= 900:
             score = int(match.group(1))
     if rank is None:
-        match = re.search(r"位次\s*[:：]?\s*(\d{2,8})", message)
+        match = re.search(r"(?:位次|排名|名次)\s*[:：]?\s*(\d{2,8})", message)
         if match:
             rank = int(match.group(1))
     return score, rank
@@ -333,6 +333,9 @@ def retrieve_schools(
             locations.add(value)
     if "江浙沪" in message or "长三角" in message:
         locations.update({"浙江", "江苏", "上海"})
+    province = (profile or {}).get("province")
+    if province and (province in message or not locations):
+        locations.add(province)
 
     conditions = []
     for term in list(dict.fromkeys(locations))[:12]:
@@ -436,6 +439,26 @@ def build_context(rows) -> tuple[str, list[str]]:
     return context, unique_sources
 
 
+CHAT_REQUIRED_LABELS = {
+    "province": "生源省份",
+    "rank": "省内位次",
+    "subjects": "三门选考科目",
+}
+
+
+def missing_chat_fields(profile: dict | None) -> list[str]:
+    """Required conversational facts; score and preferences remain optional."""
+    p = profile or {}
+    missing = []
+    if not p.get("province"):
+        missing.append("province")
+    if p.get("rank") is None:
+        missing.append("rank")
+    if len(p.get("subjects") or []) != 3:
+        missing.append("subjects")
+    return [CHAT_REQUIRED_LABELS[field] for field in missing]
+
+
 def profile_text(profile: dict | None) -> str:
     if not profile:
         return "未填写画像。"
@@ -462,7 +485,9 @@ def build_messages(
     history: list[ConversationMessage],
     message: str,
     school_context: str = "",
+    missing_fields: list[str] | None = None,
 ) -> list[dict]:
+    missing = "、".join(missing_fields or [])
     system = (
         SYSTEM_PROMPT
         + "\n<profile>\n"
@@ -472,6 +497,13 @@ def build_messages(
         + "\n</retrieved_data>\n<school_directory>\n"
         + (school_context or "未检索到匹配的全国院校名录数据。")
         + "\n</school_directory>"
+        + (
+            "\n<missing_profile_fields>\n" + missing + "\n</missing_profile_fields>\n"
+            "如果对方在问推荐、院校或专业，而上面这些必需项缺失，你必须在回答里明确请对方补充；"
+            "可以把这些项合并成一句追问。无论数据是否齐全，都不能返回空内容。"
+            if missing
+            else ""
+        )
     )
     messages = [{"role": "system", "content": system}]
     for item in history[-MAX_HISTORY_MESSAGES:]:

@@ -2,12 +2,10 @@ import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
-  MapPin,
   LocateFixed,
   Plus,
   Minus,
   Sparkles,
-  ChevronRight,
   FileCheck2,
   MessagesSquare,
   Navigation,
@@ -173,9 +171,7 @@ export function StarMap({
           <span className="live-dot" /> 你的院校探索图
         </span>
         <span>
-          {data.profile?.province || "未设省份"} ·{" "}
-          {data.profile?.subjects.map((s) => s[0]).join("") || "选科待补充"} ·
-          {isMock ? "示例分布" : "探索布局"}
+          院校位置与层次 · {isMock ? "示例分布" : "探索布局"}
         </span>
       </div>
       <div
@@ -220,16 +216,14 @@ export function StarMap({
                   left: `${boatPosition.x}%`,
                   top: `${boatPosition.y}%`,
                 }}
-                onClick={() => navigate("/profile")}
-                aria-label={`你的船，${docked ? `停靠${docked.name}` : `省内位次${rank?.toLocaleString() ?? "未填写位次"}`}；点击修改考生档案`}
+                onClick={() => window.dispatchEvent(new Event("nv-open-chat"))}
+                aria-label={`你的船，${docked ? `停靠${docked.name}` : "从这里出发"}；点击和领航员聊聊`}
               >
                 <span className="boat-ripple" aria-hidden="true" />
                 <img src={voyagerTop} alt="俯视下坐在船上、手持星图的航海者" />
                 <span className="position-label">
                   {docked ? "已停靠" : "你的位置"}{" "}
-                  <b>
-                    {docked?.name ?? rank?.toLocaleString() ?? "未填写位次"}
-                  </b>
+                  <b>{docked?.name ?? "从这里出发"}</b>
                 </span>
               </button>
             )}
@@ -408,61 +402,25 @@ export function Home({ openChat }: { openChat: () => void }) {
         </section>
         <section className="profile-snapshot">
           <div className="snapshot-top">
-            <span className="eyebrow">MY VOYAGE</span>
+            <span className="eyebrow">ONE CONVERSATION</span>
             <span>✧</span>
           </div>
           <h2>
-            先认识你，
+            不用填表，
             <br />
-            再一起看世界。
+            边聊边整理。
           </h2>
-          <p>每一条航线，都从你的坐标开始。</p>
-          {data.profile ? (
-            <>
-              <div className="score-row">
-                <div>
-                  <strong>{data.profile.score ?? "待补充"}</strong>
-                  <small>高考分数</small>
-                </div>
-                <span />
-                <div>
-                  <strong>
-                    {data.profile.rank?.toLocaleString() ?? "待补充"}
-                  </strong>
-                  <small>全省位次</small>
-                </div>
-              </div>
-              <div className="profile-chips">
-                <span>
-                  <MapPin size={12} />
-                  {data.profile.province} · {data.profile.year}
-                </span>
-                <span>{data.profile.subjects.join(" / ")}</span>
-              </div>
-              <button
-                className="button gold-button"
-                onClick={() => navigate("/routes")}
-              >
-                看看我的推荐航线
-                <ArrowRight size={16} />
-              </button>
-              <button
-                className="text-button"
-                onClick={() => navigate("/profile")}
-              >
-                调整我的考生档案
-                <ChevronRight size={13} />
-              </button>
-            </>
-          ) : (
-            <button
-              className="button gold-button"
-              onClick={() => navigate("/profile")}
-            >
-              建立我的档案
-              <ArrowRight size={15} />
-            </button>
-          )}
+          <p>
+            把你的省份、位次、选考和想法直接说给领航员。对话里明确的信息会自动记下，用来调整星图和推荐。
+          </p>
+          <button
+            className="button gold-button"
+            onClick={() => ask("我想先看看适合我的方向")}
+          >
+            继续和领航员聊
+            <ArrowRight size={16} />
+          </button>
+          <p className="muted">没有标准答案，先从一句话开始。</p>
         </section>
       </div>
       <section className="echo-preview">
