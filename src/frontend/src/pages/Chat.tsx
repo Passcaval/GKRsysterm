@@ -160,6 +160,12 @@ export default function Chat({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError("");
     setTrace([]);
+    const priorHistory = data.user
+      ? undefined
+      : messages
+          .filter((m) => m.text)
+          .slice(-8)
+          .map((m) => ({ role: m.role, content: m.text }));
     setMessages((m) => [
       ...m,
       { role: "user", text, sourceIds: [] },
@@ -168,7 +174,12 @@ export default function Chat({ onClose }: { onClose: () => void }) {
     const c = new AbortController();
     controller.current = c;
     try {
-      for await (const e of api.chat(text, conversation, c.signal)) {
+      for await (const e of api.chat(
+        text,
+        conversation,
+        c.signal,
+        priorHistory,
+      )) {
         if (e.type === "tool_start")
           setTrace((t) => [
             ...t,
@@ -331,7 +342,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
             </div>
           ) : (
             <p className="notice amber">
-              登录后直接和领航员聊，就能边聊边整理报考信息并获得推荐。
+              不用登录也可以先问。登录后可以保存正式推荐任务、参与社区发帖；管理功能需要管理员账号。
               <button
                 className="text-button"
                 onClick={() => {
@@ -339,7 +350,7 @@ export default function Chat({ onClose }: { onClose: () => void }) {
                   navigate("/login");
                 }}
               >
-                前往登录
+                登录
               </button>
             </p>
           )}

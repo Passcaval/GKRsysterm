@@ -5,8 +5,18 @@ import json
 import pytest
 from conftest import HEADERS, PASSWORD
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
-from app.db.models import ChatProfileSignal
+from app.cli import clear_chat_profiles
+from app.db.models import (
+    ChatProfileSignal,
+    Conversation,
+    ConversationMessage,
+    Feedback,
+    ProfileVersion,
+    RecommendationRun,
+    User,
+)
 from app.main import create_app
 
 
@@ -169,3 +179,52 @@ def test_chat_saves_partial_profile_without_manual_fields(app, modern_chat):
     with app.state.sessions() as db:
         signal = db.get(ChatProfileSignal, proposal["signal_id"])
         assert signal.status == "confirmed"
+
+
+def test_redeploy_cleanup_clears_profiles_and_chat_context(app, modern_chat):
+    saved = modern_chat.patch("/api/v1/me/profile", json=profile_payload())
+    assert saved.status_code == 200, saved.text
+    chat = modern_chat.post(
+        "/api/v1/chat/stream",
+        json={"message": "我现在在浙江，628分，位次20000"},
+    )
+    assert chat.status_code == 200, chat.text
+
+    with app.state.sessions() as db:
+        user = db.scalar(select(User))
+        profile = db.scalar(select(ProfileVersion).order_by(ProfileVersion.version.desc()))
+        run = RecommendationRun(
+            owner_id=user.id,
+            profile_version_id=profile.id,
+            snapshot={},
+        )
+        db.add(run)
+        db.flush()
+        db.add(
+            Feedback(
+                owner_id=user.id,
+                run_id=run.id,
+                recommendation_item_id="item-1",
+                profile_version_id=profile.id,
+                kind="favorite",
+                reason="",
+            )
+        )
+        db.commit()
+        run_id = run.id
+
+        removed = clear_chat_profiles(db)
+        assert removed == 2
+        assert db.get(RecommendationRun, run_id).profile_version_id is None
+        assert db.scalar(select(func.count()).select_from(ProfileVersion)) == 0
+        assert db.scalar(select(func.count()).select_from(ChatProfileSignal)) == 0
+        assert db.scalar(select(func.count()).select_from(ConversationMessage)) == 0
+        assert db.scalar(select(func.count()).select_from(Conversation)) == 0
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(Feedback)
+                .where(Feedback.profile_version_id.is_not(None))
+            )
+            == 0
+        )

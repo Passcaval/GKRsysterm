@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
-from uuid import UUID
+from typing import Literal
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -12,7 +13,7 @@ from pydantic import Field
 
 from app.core.errors import DomainError, missing
 from app.core.model import ModelCallFailed, ModelGateway, ModelNotConfigured
-from app.core.security import current_user, throttle
+from app.core.security import optional_user, throttle
 from app.db.models import ChatProfileSignal, Conversation, now
 from app.db.session import get_db
 from app.modules.agent.profile_signals import (
@@ -56,9 +57,15 @@ def _profile_state(record) -> dict:
     return data
 
 
+class ChatTurn(StrictModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ChatInput(StrictModel):
     message: str = Field(min_length=1, max_length=4000)
     conversationId: UUID | None = None
+    history: list[ChatTurn] = Field(default_factory=list, max_length=8)
 
 
 def _event(payload: dict) -> str:
@@ -66,7 +73,7 @@ def _event(payload: dict) -> str:
 
 
 @router.post("/chat/stream")
-def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depends(get_db)):
+def chat(data: ChatInput, request: Request, user=Depends(optional_user), db=Depends(get_db)):
     throttle(request, "chat")
     settings = request.app.state.settings
     factory = getattr(request.app.state, "model_gateway_factory", None)
@@ -81,23 +88,37 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
     except ModelNotConfigured:
         raise DomainError(503, "MODEL_NOT_CONFIGURED", "未配置模型服务，无法使用领航员。") from None
 
-    conversation = db.get(Conversation, data.conversationId) if data.conversationId else None
-    if data.conversationId and (not conversation or conversation.owner_id != user.id):
-        gateway.close()
-        missing()
-    if not conversation:
-        conversation = Conversation(owner_id=user.id)
-        db.add(conversation)
-        db.commit()
-        db.refresh(conversation)
+    anonymous = user is None
+    if anonymous:
+        conversation = None
+        profile_record = None
+        prior_conversation = merge_chat_values(None, [])
+        for turn in data.history:
+            if turn.role == "user":
+                prior_conversation = merge_chat_values(
+                    prior_conversation,
+                    extract_profile_changes(prior_conversation, turn.content),
+                )
+        history = data.history
+        user_message = None
+    else:
+        conversation = db.get(Conversation, data.conversationId) if data.conversationId else None
+        if data.conversationId and (not conversation or conversation.owner_id != user.id):
+            gateway.close()
+            missing()
+        if not conversation:
+            conversation = Conversation(owner_id=user.id)
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+        profile_record = current_profile(db, user.id)
+        prior_conversation = conversation_profile(db, conversation.id)
+        history = history_for(db, conversation.id)
+        user_message = add_message(db, conversation.id, user.id, "user", data.message)
+        db.flush()
 
-    profile_record = current_profile(db, user.id)
-    prior_conversation = conversation_profile(db, conversation.id)
-    history = history_for(db, conversation.id)
-    user_message = add_message(db, conversation.id, user.id, "user", data.message)
-    db.flush()
     changes = extract_profile_changes(prior_conversation, data.message)
-    if changes:
+    if changes and not anonymous:
         global_changes = [
             change
             for change in changes
@@ -144,7 +165,7 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
     )
 
     signal = None
-    if changes:
+    if changes and not anonymous:
         signal = ChatProfileSignal(
             owner_id=user.id,
             conversation_id=conversation.id,
@@ -159,13 +180,13 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
         db.flush()
     db.commit()
 
-    conversation_id = conversation.id
-    owner_id = user.id
+    conversation_id = conversation.id if conversation else uuid4()
+    owner_id = user.id if user else None
     model_name = settings.model_name
     contract_version = getattr(request.app.state, "contract_version", "0.4")
     sessions = request.app.state.sessions
-    signal_id = signal.id if signal else None
-    expected_version = profile_record.version if profile_record else None
+    event_signal_id = str(signal.id) if signal else (str(uuid4()) if changes else None)
+    expected_version = profile_record.version if profile_record else 0
     question = signal_applied_question(changes) if changes else ""
     profile_payload = _profile_state(profile_record) if profile_record else None
     conversation_payload = {
@@ -216,20 +237,20 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
                 )
             if source_ids:
                 yield _event({"type": "evidence", "source_ids": source_ids})
-            if signal_id is not None:
-                yield _event(
-                    {
-                        "type": "profile_update",
-                        "signal_id": str(signal_id),
-                        "applied": True,
-                        "profile": profile_payload,
-                        "conversation_profile": conversation_payload,
-                        "changes": changes,
-                        "expected_version": expected_version,
-                        "question": question,
-                        "source_ids": source_ids,
-                    }
-                )
+            if event_signal_id is not None:
+                payload = {
+                    "type": "profile_update",
+                    "signal_id": event_signal_id,
+                    "applied": True,
+                    "conversation_profile": conversation_payload,
+                    "changes": changes,
+                    "expected_version": expected_version,
+                    "question": question,
+                    "source_ids": source_ids,
+                }
+                if profile_payload is not None:
+                    payload["profile"] = profile_payload
+                yield _event(payload)
 
             try:
                 for delta in gateway.stream_text(
@@ -258,21 +279,22 @@ def chat(data: ChatInput, request: Request, user=Depends(current_user), db=Depen
             if not text:
                 text = fallback_text
                 yield _event({"type": "delta", "text": text})
-            with sessions.begin() as save_db:
-                add_message(
-                    save_db,
-                    conversation_id,
-                    owner_id,
-                    "assistant",
-                    text,
-                    source_ids=source_ids,
-                    model_name=model_name,
-                )
+            if owner_id is not None:
+                with sessions.begin() as save_db:
+                    add_message(
+                        save_db,
+                        conversation_id,
+                        owner_id,
+                        "assistant",
+                        text,
+                        source_ids=source_ids,
+                        model_name=model_name,
+                    )
             saved = True
             done_key = "conversation_id" if contract_version == "0.4" else "conversationId"
             yield _event({"type": "done", done_key: str(conversation_id)})
         finally:
-            if not saved and chunks:
+            if not saved and chunks and owner_id is not None:
                 try:
                     with sessions.begin() as save_db:
                         add_message(

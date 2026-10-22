@@ -51,6 +51,8 @@ SSE 事件（`data: <JSON>`）：
 
 画像不再通过表单填写。后端从用户消息中识别明确的生源省份、年份、分数、位次、完整三门选科、意向地域、专业和院校，自动合并为新的 `ProfileVersion`，同时写入 `chat_profile_signals` 作为可审计的搜索反馈；没有足够信息时保存为草稿，不用模型猜测补齐。
 
+`POST /chat/stream` 允许未登录访问。匿名请求不绑定账户、不写 `ProfileVersion`、`chat_profile_signals`、`conversations` 或 `conversation_messages`，只使用请求携带的最多 8 条 `history` 构建临时会话画像；登录后才持久化并更新全局画像。发帖和正式推荐保存仍需登录，审核/管理接口继续要求管理员会话。
+
 - SSE 在模型回答前发送 `profile_update` 事件：`signal_id`、`applied`、`profile`（全局画像快照）、`conversation_profile`（本会话画像）、`changes`（`field`/`label`/`old`/`new`）、`expected_version`、`question`、`source_ids`。新会话只合并本会话信号，不继承其他会话或全局画像中的旧字段。
 - 前端不再显示确认卡片；收到事件后直接更新全局画像，星图和推荐状态随之刷新。
 - `POST /api/v1/chat/profile-signals/{signal_id}/resolve` 仅保留给历史待确认信号；新对话不再产生 `proposed` 状态。想去的省份保存为地域偏好，不覆盖生源省份。

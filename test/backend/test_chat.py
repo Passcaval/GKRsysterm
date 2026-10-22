@@ -5,9 +5,15 @@ import json
 import pytest
 from conftest import HEADERS, PASSWORD
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 
-from app.db.models import ConversationMessage, School
+from app.db.models import (
+    ChatProfileSignal,
+    Conversation,
+    ConversationMessage,
+    ProfileVersion,
+    School,
+)
 from app.main import create_app
 
 
@@ -72,6 +78,51 @@ def modern_chat(app):
         )
         assert login.status_code == 200, login.text
         yield client, factory
+
+
+def test_anonymous_chat_uses_client_history_without_account_writes(app):
+    application = create_app(app.state.settings)
+    factory = Factory()
+    application.state.model_gateway_factory = factory
+    with TestClient(application, headers=HEADERS) as client:
+        first = client.post(
+            "/api/v1/chat/stream",
+            json={"message": "620 浙江省内排名33226 有什么院校推荐"},
+        )
+        assert first.status_code == 200, first.text
+        first_payloads = events(first)
+        update = next(item for item in first_payloads if item["type"] == "profile_update")
+        assert "profile" not in update
+        assert update["conversation_profile"]["province"] == "浙江"
+        assert update["conversation_profile"]["rank"] == 33226
+        conversation_id = first_payloads[-1]["conversation_id"]
+
+        second = client.post(
+            "/api/v1/chat/stream",
+            json={
+                "message": "选了物化生",
+                "conversation_id": conversation_id,
+                "history": [
+                    {"role": "user", "content": "620 浙江省内排名33226"},
+                    {"role": "assistant", "content": "还缺选科信息。"},
+                ],
+            },
+        )
+        assert second.status_code == 200, second.text
+        second_update = next(item for item in events(second) if item["type"] == "profile_update")
+        assert second_update["conversation_profile"]["province"] == "浙江"
+        assert second_update["conversation_profile"]["rank"] == 33226
+        assert second_update["conversation_profile"]["subjects"] == [
+            "物理",
+            "化学",
+            "生物",
+        ]
+
+    with app.state.sessions() as db:
+        assert db.scalar(select(func.count()).select_from(ProfileVersion)) == 0
+        assert db.scalar(select(func.count()).select_from(Conversation)) == 0
+        assert db.scalar(select(func.count()).select_from(ChatProfileSignal)) == 0
+        assert db.scalar(select(func.count()).select_from(ConversationMessage)) == 0
 
 
 def test_chat_streams_retrieves_and_persists(app, modern_chat, published):

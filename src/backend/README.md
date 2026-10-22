@@ -60,7 +60,7 @@ pnpm run dev
 
 ## AI 领航员聊天
 
-`POST /api/v1/chat/stream` 已接入 OpenAI 兼容的流式模型（与招生抓取共用 `MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME`）。它优先检索已发布、已审核的 `admission_units`；没有命中时回退到已发布的全国院校名录，只提供学校名称、所在地和办学层次，并明确说明名录不含专业、投档分和招生计划。用户最新画像和最近 8 条会话消息放入上下文，以 SSE 返回 `tool_start`、`tool_end`、`evidence`、`delta`、`done`/`error` 事件。会话消息保存在 `conversation_messages` 表；未配置模型时返回 503，不伪造回答。
+`POST /api/v1/chat/stream` 已接入 OpenAI 兼容的流式模型（与招生抓取共用 `MODEL_BASE_URL`、`MODEL_API_KEY`、`MODEL_NAME`）。它优先检索已发布、已审核的 `admission_units`；没有命中时回退到已发布的全国院校名录，只提供学校名称、所在地和办学层次，并明确说明名录不含专业、投档分和招生计划。用户最新画像和最近 8 条会话消息放入上下文，以 SSE 返回 `tool_start`、`tool_end`、`evidence`、`delta`、`done`/`error` 事件。登录用户的消息保存在 `conversation_messages` 表；未登录也可使用普通问答，匿名请求由前端携带最近对话 `history`，不创建数据库会话或账户画像。未配置模型时返回 503，不伪造回答。
 
 聊天回答不是正式推荐，不计算录取概率；个性化冲稳保仍需使用画像和推荐任务。当前没有向量检索、网页工具或跨用户记忆。提示词明确要求不编造院校代码、专业代码、分数、位次、学费和选科要求，并要求在检索数据与用户分数差距明显时说明该批次不适合。
 

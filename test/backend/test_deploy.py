@@ -20,5 +20,15 @@ def test_migrations_finish_before_workers_start(monkeypatch):
         ("build",),
         ("up", "--detach", "--wait", "postgres"),
         ("run", "--rm", "--no-deps", "api", "python", "-m", "alembic", "upgrade", "head"),
+        (
+            "run",
+            "--rm",
+            "--no-deps",
+            "api",
+            "python",
+            "-m",
+            "app.cli",
+            "clear-chat-profiles",
+        ),
         ("up", "--detach", "--wait"),
     ]

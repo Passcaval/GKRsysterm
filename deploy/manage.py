@@ -315,6 +315,10 @@ def deploy() -> None:
     # A new database has no job/crawl tables yet. Migrate before workers get
     # their single startup-crawl attempt, using the newly built API image.
     docker_compose("run", "--rm", "--no-deps", "api", "python", "-m", "alembic", "upgrade", "head")
+    # Every update/redeploy starts without stale chat-derived profiles.
+    docker_compose(
+        "run", "--rm", "--no-deps", "api", "python", "-m", "app.cli", "clear-chat-profiles"
+    )
     docker_compose("up", "--detach", "--wait")
     print("Deployment is ready.")
     print("Open http://localhost:" + read_env().get("HTTP_PORT", "8080"))

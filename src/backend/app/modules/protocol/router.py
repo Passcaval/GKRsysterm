@@ -866,15 +866,17 @@ def unshare(request: Request, user=Depends(current_user)):
 
 
 @router.post("/chat/stream")
-def chat(request: Request, data: dict = Body(), user=Depends(current_user), db=Depends(get_db)):
+def chat(request: Request, data: dict = Body(), user=Depends(optional_user), db=Depends(get_db)):
     from app.modules.agent.router import ChatInput
     from app.modules.agent.router import chat as old_chat
 
-    if set(data) - {"message", "conversation_id"}:
+    if set(data) - {"message", "conversation_id", "history"}:
         raise DomainError(422, "INVALID_INPUT", "对话字段不正确。")
     try:
         parsed = ChatInput(
-            message=data.get("message", ""), conversationId=data.get("conversation_id")
+            message=data.get("message", ""),
+            conversationId=data.get("conversation_id"),
+            history=data.get("history", []),
         )
     except ValidationError:
         raise DomainError(422, "INVALID_INPUT", "对话内容或会话编号不正确。") from None
